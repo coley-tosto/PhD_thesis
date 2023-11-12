@@ -163,7 +163,14 @@ These values will be influenced by the number of 0s coming from females who did 
 |Developed Embryos | `r mean(fem_succ$NumDeveloped[fem_succ$mated == 1])`|`r sd(fem_succ$NumDeveloped[fem_succ$mated == 1])`|  `r sd(fem_succ$NumDeveloped[fem_succ$mated == 1])/sqrt(nrow(fem_succ[fem_succ$mated == 1,]))`|`r max(fem_succ$NumDeveloped[fem_succ$mated == 1])` | `r min(fem_succ$NumDeveloped[fem_succ$mated == 1])` |
 |Undeveloped Embryos| `r mean(fem_succ$NumUndeveloped[fem_succ$mated == 1])`|`r sd(fem_succ$NumUndeveloped[fem_succ$mated == 1])`|  `r sd(fem_succ$NumUndeveloped[fem_succ$mated == 1])/sqrt(nrow(fem_succ[fem_succ$mated == 1,]))`| `r max(fem_succ$NumUndeveloped[fem_succ$mated == 1])` | `r min(fem_succ$NumUndeveloped[fem_succ$mated == 1])` |
 
-We can see from the bottom table that even when we only include females who mated there is still a wide range in the number of eggs transferred. I want to see what relationship there may be between female body size (in terms of standard length, depth, and SVL) and the number of eggs she transferred.
+We can see from the bottom table that even when we only include females who mated there is still a wide range in the number of eggs transferred. I want to see what relationship there may be between female body size (in terms of standard length, depth, and SVL) and the number of eggs she transferred. I also want to see on average how many eggs were transferred per mating. I'm going to calculate this by taking the total number of eggs and dividing it by the number of mates. 
+
+```{r egg-per-mate-fem}
+fem_succ$eggs_per_mate <- fem_succ$totalEggs/fem_succ$MatingSuccess
+mean(fem_succ$eggs_per_mate, na.rm = TRUE)
+sd(fem_succ$eggs_per_mate, na.rm = TRUE)/sqrt(nrow(fem_succ))
+```
+
 
 ```{r em-v-fem-size, echo=FALSE, fig.cap="Scatterplot of the relationship between female size metrics and the number of eggs transferred.", fig.width=15, fig.height=5}
 #create a subset of only the females who mated
@@ -272,7 +279,9 @@ boxplot(fem_succ$weight ~ fem_succ$mated,
 
 ```{r mat-stat-stat-fem, echo=FALSE, warning=FALSE}
 wilcox.test(fem_succ$length ~ fem_succ$mated)
+t.test(fem_succ$length ~ fem_succ$mated, var.equal = FALSE)
 wilcox.test(fem_succ$depth ~ fem_succ$mated)
+t.test(fem_succ$depth ~ fem_succ$mated, var.equal = FALSE)
 wilcox.test(fem_succ$svl ~ fem_succ$mated)
 wilcox.test(fem_succ$weight ~ fem_succ$mated)
 ```
@@ -320,5 +329,10 @@ abline(wls_model_fem, col = "#7fc97f", lwd = 3, lty = 2)
 abline(wls_model_mal, col = "#beaed4", lwd = 3, lty = 2)
 
 
+```
+
+```{r}
+summary(wls_model_fem)
+summary(wls_model_mal)
 ```
 
