@@ -1,0 +1,7 @@
+*.[oa]
+
+# ignore the latex file outputs that are made when redering to pdf
+*.tex
+
+# ignoring all of the RHistory files
+*.Rhistory
