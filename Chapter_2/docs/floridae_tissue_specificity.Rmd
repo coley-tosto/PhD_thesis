@@ -362,8 +362,14 @@ I used the same steps as above to see how the relationship changes when I add in
 ```{r tau-v-FC, echo=FALSE, fig.cap="Sex bias (in terms of the absolute value of the log2FoldChange) versus tissue specificity (tau) for all genes that are signifcantly expressed in the gonads, liver, and gills."}
 #Merge the noNA datasets that include all of the sex-biased and non-sex-biased genes with the tau datasets
 liver_bias_tau_all <- merge(as.data.frame(liver_con_res_noNA), as.data.frame(tau), by = "row.names")
+write.csv(liver_bias_tau_all, "liver_bias_tau.csv", row.names = FALSE)
+
 gonad_bias_tau_all <- merge(as.data.frame(gonad_con_res_noNA), as.data.frame(tau), by = "row.names")
+write.csv(gonad_bias_tau_all, "gonad_bias_tau.csv", row.names = FALSE)
+
 gill_bias_tau_all <- merge(as.data.frame(gill_con_res_noNA), as.data.frame(tau), by = "row.names")
+write.csv(gill_bias_tau_all, "gill_bias_tau.csv", row.names = FALSE)
+
 
 #Plot logFC against Tau for all of the organs
 par(mar=c(5.1, 4.1, 4.1, 8.1), xpd=FALSE)
@@ -542,7 +548,7 @@ logFC_long_all$bias <- ifelse(logFC_long_all$logFC <= -2 & logFC_long_all$padj <
   
 #Categorize the degree of sex bias in each row
 #Make a vector that contains all of the groupings
-biased_bins <- c("Unbiased", "Low", "Med", "High", "Extreme")
+biased_bins <- c("Unbiased", "Low", "Med", "High", "Extreme", "Sex-specific")
 
 #Create a new column in the dataset and use ifelse statements to set the category limits
 #abs(logFC) was used to account for the fem-biased genes possessing negative values
@@ -563,7 +569,117 @@ logFC_long_all$bias_cat <- ifelse(logFC_long_all$bias == "UB",
 #Making sure the ordering stays correct
 logFC_long_all$bias_cat <- factor(logFC_long_all$bias_cat,
     levels = biased_bins, ordered = TRUE)
+
+logFC_long_all$tissue <- factor(logFC_long_all$tissue, levels = c("Gonad", "Liver", "Gill"), ordered = TRUE)
+
+#write.csv(logFC_long_all, "logFC_long_taubias.csv", row.names = FALSE)
 ```
+
+```{r sex-specific-for-loop}
+#Filtering the dds object to get rid of the DESeq outliers
+dds_FL_filtered <- dds_FL[!(rownames(dds_FL) %in% out_ids), ]
+
+dds_FL_filtered$Organ <- ifelse(dds_FL_filtered$Organ =="Ovaries",
+                        paste0("Gonad"),
+                        ifelse(dds_FL_filtered$Organ == "Testis",
+                               paste0("Gonad"),
+                               paste0(dds_FL_filtered$Organ))
+                        )
+#Create a vector with the different organ types
+organs <- levels(colData(dds_FL_filtered)$Organ)
+
+#Create an empty list to store my datasets in
+FL_sex_specific_genes <- list()
+
+#Generate the for loop to identify MSpecific and FSpecific genes in each organ based on Medians
+for(organ in organs){
+  
+  #Male-Specific Genes
+  ##Pull out all of the rows where fem count = 0
+  fem0_organ <- assay(dds_FL_filtered)[rowSums(assay(dds_FL_filtered)[, dds_FL_filtered$Sex == "F" 
+                                                    & dds_FL_filtered$Organ==organ]) < 1,
+                              dds_FL_filtered$Organ == organ]
+  
+  ##Pull out rows where median of male count >=10 for that organ
+  mal10_organ <- apply(assay(dds_FL_filtered)[, dds_FL_filtered$Sex == "M" 
+                                     & dds_FL_filtered$Organ == organ],
+                       1,
+                       function(x) median(x) >=10)
+  
+  ##Keep only the rows where fem=0 and the Male median>=10
+  fem0_mal10_organ <- fem0_organ[rownames(fem0_organ) %in% names(mal10_organ[mal10_organ == TRUE]),]
+  
+  ##Create a new object with a name based on the organ type
+  organ_malsp <- sub("$", "_male_specific", organ)
+  FL_sex_specific_genes[[organ_malsp]] <- fem0_mal10_organ
+  
+  
+  
+  #Female-Specific Genes
+  ##Pull out all of the rows where male count = 0
+  mal0_organ <- assay(dds_FL_filtered)[rowSums(assay(dds_FL_filtered)[, dds_FL_filtered$Sex == "M" 
+                                                    & dds_FL_filtered$Organ==organ]) < 1,
+                              dds_FL_filtered$Organ == organ]
+  
+  ##Pull out rows where median of female count >=10 for that organ
+  fem10_organ <- apply(assay(dds_FL_filtered)[, dds_FL_filtered$Sex == "F" & dds_FL_filtered$Organ == organ],
+                       1,
+                       function(x) median(x) >=10)
+  
+  #Keep only the rows where male=0 and the fem median>=10
+  mal0_fem10_organ <- mal0_organ[rownames(mal0_organ) %in% names(fem10_organ[fem10_organ == TRUE]),]
+  
+  # Create a new object with a name based on the organ type
+  organ_femsp <- sub("$", "_female_specific", organ)
+  FL_sex_specific_genes[[organ_femsp]] <- mal0_fem10_organ
+} 
+```
+
+
+```{r}
+organs <- c("Gill", "Gill", "Gonad", "Gonad", "Liver", "Liver")
+bias <- c("MB", "FB", "MB", "FB", "MB", "FB")
+
+for(i in 1:length(FL_sex_specific_genes)){
+
+  tmp <- FL_sex_specific_genes[[i]]
+  tmp <- as.data.frame(tmp)
+  tmp$geneID <- rownames(tmp)
+  
+  ssp<-do.call(rbind,apply(tmp, 1, function(one_gene){
+    
+    if(one_gene["geneID"] %in% 
+       logFC_long_all$geneID[logFC_long_all$tissue == organs[[i]] &
+                             logFC_long_all$bias == bias[[i]]]){
+      
+      one_gene_dat<-logFC_long_all[logFC_long_all$geneID == one_gene["geneID"] &
+                       logFC_long_all$tissue == organs[[i]],
+                     ]
+      one_gene_dat$bias_cat <- "Sex-specific"
+      
+    }else{
+      
+      one_gene_dat <- data.frame(matrix(ncol= ncol(logFC_long_all),
+                                      nrow=1))
+      colnames(one_gene_dat) <- colnames(logFC_long_all)
+      
+      one_gene_dat$tissue <- organs[[i]]
+      one_gene_dat$geneID <- one_gene["geneID"]
+      one_gene_dat$tau <- tau[names(tau) == one_gene["geneID"]]
+      one_gene_dat$bias <- bias[[i]]
+      one_gene_dat$bias_cat <- "Sex-specific"
+    
+    }
+    
+    
+    return(one_gene_dat)
+  }))
+  rownames(ssp)<-NULL
+  logFC_long_all<-rbind(logFC_long_all, ssp)
+  browser()
+}
+```
+
 
 ```{r tau-v-biascat-plot-all-bp, echo=FALSE, fig.width=15, fig.height=8, fig.cap="Tissue specifcity (tau) across the different bias levels. Color denotes female-biased versus male biased versus unbiased and jitters were added to show all of the raw tau values."}
 my_colors <- c("FB" = "#7fc97f", "MB" = "#beaed4", "UB" = "darkgray" )
@@ -604,7 +720,7 @@ geom_point(data = logFC_long_all[logFC_long_all$bias == "UB",], aes(x=bias_cat, 
 ```
 
 
-```{r tau-v-biascat-plot-all-vp, echo=FALSE, fig.height=8, fig.cap="Violin plot showing tissue specifcity (tau) across the different bias levels. Color denotes female-biased versus male biased versus unbiased and jitters were added to show all of the raw tau values."}
+```{r tau-v-biascat-plot-all-vp-jitt, echo=FALSE, fig.height=8, fig.cap="Violin plot showing tissue specifcity (tau) across the different bias levels. Color denotes female-biased versus male biased versus unbiased and jitters were added to show all of the raw tau values."}
 my_colors <- c("FB" = "#7fc97f", "MB" = "#beaed4", "UB" = "darkgray" )
 
 plotdat <- ggplot(logFC_long_all,
@@ -751,3 +867,31 @@ ggplot(MFlogFC_long,
 ```
 
 The jitter points added on top represent the raw $\tau$ value. There is a large spread of $\tau$ for all of the bias groups, but from looking at the boxplot it does appear that the unbiased genes have lower $\tau$ than both the male-biased and the female-biased (Fig. \@ref(fig:MF-long))
+
+# Generating the figure
+```{r, fig.height=10, fig.width=8}
+my_colors <- c("Gonad" = "#EEB42275", "Liver" = "#EE826275", "Gill" = "#20B2AA75")
+tauvbias <- ggplot(logFC_long_all, aes(x = sqrt(abs(logFC)), y = tau, color = tissue)) +
+  geom_point() +
+  scale_color_manual(values = my_colors) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black")) +
+  geom_smooth(data = logFC_long_all[logFC_long_all$tissue == "Gonad",], 
+              method = "lm", color = "#EEB422", se = FALSE, lty = 1) +
+  geom_smooth(data = logFC_long_all[logFC_long_all$tissue == "Liver",], 
+              method = "lm", color = "#EE7073", lty = 1, se = FALSE) +
+  geom_smooth(data = logFC_long_all[logFC_long_all$tissue == "Gill",], 
+              method = "lm", color = "#20B2AA", se = FALSE, lty = 1) + 
+  labs(x="Sex Bias (|Log2 Fold Change|)", y=expression(tau["TPM"])) +
+  guides(fill = guide_legend(title = "Organ", order = 3))
+
+p2 <- ggdraw() + draw_image("imgs/tau_bias_cat_FL.jpg")
+plot_grid(tauvbias, p2,
+          ncol = 1,
+          align = 'v',
+          labels = c("A", "B"))
+```
+
+

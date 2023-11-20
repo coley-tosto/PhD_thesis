@@ -153,3 +153,23 @@ It appears that the low number of genes that we are seeing here may be due to a 
 ```
 
 The script was run as `nohup bash bash_scripts/bwa_alignment.sh trinity_supertran_floridae.fasta bwa_index/floridae floridae_kmer_corrected/ floridae_SAM_bwa/ floridae_BAM_bwa/ > bwa.log 2>&1 &`.
+
+After running the above script SAMtools was used to generate some of the stats for the BAM files (such as mapping rate) as `samtools flagstat file.bam` and I noticed that all of the outputs from that stats file were 0, indiciating that something went wrong with bwa.
+
+Upon investigating the .log file this error appeared:
+```
+[mem_sam_pe] paired reads have different names: "A01488:119:HY5TJDSX3:4:1101:24433:1000", "A01488:119:HY5TJDSX3:4:1101:24216:1000"
+
+[mem_sam_pe] paired reads have different names: "A01488:119:HY5TJDSX3:4:1101:25464:1000", "A01488:119:HY5TJDSX3:4:1101:24433:1000"
+```
+
+Some [googling](https://github.com/lh3/bwa/issues/228) into this made it seem as tho to fix this the fastq files need to be sorted so that they appear in the same order. To do this `fastq-tools` was installed on the RCC and `fastq-sort` was used as `fastq-sort --id file_R1.fq.gz > file_sortedR1.fq.gz` and I attempted to run bwa again. I got a different error this time:
+```
+[W::bseq_read] the 1st file has fewer sequences.
+```
+After looking into the fastq files I tested this with (with `wc -l floridae_kmer_corrected/FLG2F7_R1.fq.gz floridae_kmer_corrected/FLG2F7_R2.fq.gz`) I noticed that they do appear to have a different number of lines. This keeping of unpaired reads could have happened anywhere along the line of the pre-assembly QC and to try and fix it I am going to run the reads through `trimmomatic` again with only one argument since the main goal is to get rid of unpaired reads as was recommended on this [website](https://stackoverflow.com/questions/13203289/need-script-or-software-to-remove-unpaired-reads-from-paired-end-reads). The following script was used to do that:
+
+```{bash remove-unpaired, file="bash/trim_simple.sh"}
+
+```
+

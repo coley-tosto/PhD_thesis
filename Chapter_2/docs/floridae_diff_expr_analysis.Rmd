@@ -1,21 +1,26 @@
 ---
 title: "Differential Expression Analysis in _Syngnathus floridae_"
 output:
-  html_document:
-    df_print: paged
-    code_folding: show
-    toc: yes
-    toc_float: yes
+  bookdown::pdf_document2:
+    fig_caption: yes
+    keep_tex: yes
     number_sections: yes
+    toc: true
+header-includes: >
+  \usepackage{lipsum}
+  \usepackage{float}
+  \floatplacement{figure}{H}
 editor_options:
   chunk_output_type: console
+always_allow_html: true
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_knit$set(root.dir='../',fig_path="../imgs/")
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
 ```
 
-``` {r library, include = FALSE}
+``` {r library, include = TRUE, message = FALSE, warning = FALSE}
 #This is a cohesive list of all the libraries used in this document
 library(DESeq2)
 library(pheatmap)
@@ -29,9 +34,7 @@ library(ggplot2)
 library(kableExtra)
 library(tidyverse)
 library(knitr)
-```
-
-``` {r functions}
+library(magick)
 ```
 
 ``` {r read-data}
@@ -59,8 +62,9 @@ samples$rep_fittness <- c(169, 88, 762, 285, 467, 500, 427, 156, 0,
 
 The package `DESeq2` was used for the differential expression analysis outlined below.
 
-# Single factor analysis - Comparing Males v Females
-To analyze your data with DESeq2 you must first generate the DESeqDataSet. In order to do this we need the abundance matrix generated with `tximport` and a `samples` file that lays out all of the conditions.
+# Single factor analysis - Comparing Males v Females across all organs
+To analyze your data with DESeq2 you must first generate the DESeqDataSet. In order to do this we need the abundance matrix generated with `tximport` and a `samples` file that lays out all of the conditions. The model for this single factor analysis was run as counts ~ Sex.
+
 ```{r DESeqDataSet, message=FALSE, warning=FALSE}
 #Create the DESeq dataset
 dds_FL <- DESeqDataSetFromTximport(txi.salmon, 
@@ -69,8 +73,10 @@ dds_FL <- DESeqDataSetFromTximport(txi.salmon,
 
 ```
 
-
 The data is then pre-filtered to remove low gene counts before running further DESeq2 functions. By doing this we remove rows in which there are very few reads thus reducing the memory size of the `dds` object and increasing the speed at which we can use the transformation and testing functions in DESeq2.
+
+The cutoff here was to remove rows that had counts fewer than 10 across all samples.
+
 ```{r pre-filtering, message=FALSE, warning=FALSE}
 #only keeping rows that have at lead 10 reads total
 keep <- rowSums(counts(dds_FL)) >= 10
@@ -78,8 +84,8 @@ dds_FL <- dds_FL[keep, ]
 
 ```
 
-
 After filtering we can now perform the standard differential expression analysis that is wrapped into DESeq2.
+
 ```{r diff-exp, message=FALSE, warning=FALSE}
 #Generate the expression values
 dds_FL_exp <- DESeq(dds_FL)
@@ -107,19 +113,22 @@ sum(res05$padj < 0.05, na.rm = TRUE)
 
 ```
 
-## Visualizing the results {.tabset}
-### MA-plot - MvF Diff. {-}
+## Visualizing the results
+### MA-plot - MvF Differntial expression
 Generate an MA-plot to show the log2 fold changes attributable to sex over the mean of normalized counts for all of the samples in the `dds`. Points will be colored if the adjusted p-value is less that 0.1.
-```{r MA-plot, echo=FALSE}
+
+```{r MA-plot, echo=FALSE, fig.cap="LogFC versus the mean normalized count for all of the genes. Points that are blue have a p-value less than 0.1. The two plots are the same with the only difference coming from an adjusted y-limit. Points that are triangles represent genes with a fold change higher/lower than the y-limit."}
+
 par(mfrow=c(1,2))
 plotMA(res, ylim = c(-2,2))
 plotMA(res)
 
 ```
 
-### Heatmap - overall expression {-}
+### Heatmap - overall expression
 We can also generate a heat map to look ar overall expression levels across our samples. Note, this is not differentially expressed genes.
-```{r heatmap, echo=FALSE}
+
+```{r heatmap, echo=FALSE, fig.cap= "Heatmap showing the expression level across all organs for the top 20 genes with the highest expression levels."}
 #Pull out the top 20 rows with the most expression
 select <- order(rowMeans(counts(dds_FL_exp, normalized = TRUE)),
                 decreasing = TRUE)[1:20]
@@ -136,7 +145,8 @@ pheatmap(assay(vsd)[select,],
          annotation_col = df)
 ```
 
-From the heatmap we can pull out the names of the Trinity genes that are showing this high expression and BLAST the corresponding sequences to see what the genes are.
+From the heatmap (Fig. \@ref(fig:heatmap)) we can see that for all of these top 20 expressed genes the highest expression in found in the liver. There are also a few genes that appear to be highly expressed across all of the tissue types. With this heatmap we can also pull out the names of the Trinity genes that are showing this high expression and BLAST the corresponding sequences to see what the genes are.
+
 ```{r heatmap_genes}
 #Pull out the corresponding trinity_geneIDS that are plotted in the heatmap
 heatmap_TG <- cbind(row.names(assay(vsd)[select,]))
@@ -149,9 +159,11 @@ heatmap_TG <- cbind(row.names(assay(vsd)[select,]))
   #          col.names = FALSE)
 ```
 
-### Sample-dist Heatmap {-}
-We can then generate a sample-to-sample distances heatmap that will give an overview of the similarities and differences between our samples
-```{r sample-dist, echo=FALSE}
+### Sample-dist Heatmap
+
+We can then generate a sample-to-sample distances heatmap that will give an overview of the similarities and differences between our samples.
+
+```{r sample-dist, echo=FALSE, fig.cap="Sample-to-sample distances heatmap showing the similarities and differences between all of the samples. The darker the color, the more similar the samples are. The diagonal line of very dark blue represents the comparissons between the same samples.", warning=FALSE}
 #Calculate the sample-to-sample distances from the transformed count matrix
 sampleDists <- dist(t(assay(vsd)))
 
@@ -168,56 +180,27 @@ pheatmap(sampleDistsMatrix,
          col = colors)
 ```
 
-### PCA plots {-}
-```{r pca-plot}
-colData <- as.data.frame(samples)
-rownames(colData) <- samples$ID
+We can see that the highest similarities (aside from same samples comparissons) is between samples from the same organ (Fig. \@ref(fig:sample-dist)). After that, the next highest similarities can be seen between the male and female gonads. There is one gill sample that appears to be quite different from the rest, sample FLG4M4, definitely a sample to be paying attention to as we move through with the rest of the analysis
 
-#Prepare the PCA using the transformed data from above
-pcaFL <- pca(assay(vsd), metadata = colData)
+### PCA plots
+Next we can look at PCA plots for our samples to see how our different samples are grouping. The size of the points for these plots will be scaled by the mating success of the individual to see if that may be at all correlated with the sample grouping.
 
-#Plot the PCA
-biplot(pcaFL,
-       showLoadings = FALSE,
-       colby = 'Organ', colkey = c('Liver'='forestgreen', 'Gill'='purple', 'Gonad'='gold'),
-       colLegendTitle = "Organ Type",
-       hline = 0, vline = 0,
-       vlineType = 'dashed',
-       pointSize = 3,
-       legendPosition = 'left', legendLabSize = 10, legendIconSize = 6.0, legendTitleSize = 10,
-       shape = 'Sex', shapekey = c('M'=17, 'F'=8),
-       shapeLegendTitle = 'Sex',
-       drawConnectors = FALSE,
-       title = 'PCA bi-plot for Syngnathus floridae')
+```{r pca-scaled-organ, echo=FALSE, fig.cap="Principal components analysis reflects that most variation corresponds to differences in expression between organs (green: gill; yellow: gonad; pink: liver), rather than variation due to sex (circle = female; triangle = male) or mating status (the size of points reflects an individual’s mating success). The first axis explains 32% of variation in the dataset, with gills and liver, two types of somatic tissues, sitting on opposite ends of that axis. The second axis explains 23% of the variation in gene expression, with somatic tissues on the opposite side of the axis from the gonads.", warning=FALSE}
 
-pairsplot(pcaFL,
-          components = getComponents(pcaFL, c(1, 2, 3)),
-          triangle = FALSE,
-          hline = 0, vline = 0,
-          pointSize = 3,
-          gridlines.major = FALSE, gridlines.minor = FALSE,
-          colby = 'Organ', colkey = c('Liver'='forestgreen', 'Gill'='purple', 'Gonad'='gold'),
-          shape = 'Sex', shapekey = c('M'=17, 'F'=8),
-          title = 'Pairs plot', titleLabSize = 22,
-          legendPosition = 'left',
-          axisLabSize = 10, plotaxes = TRUE,
-          margingaps = unit(c(0.1, 0.1, 0.1, 0.1), 'cm'))
-```
-
-```{r pca_scaled, echo=FALSE}
-
+#Generate the PCA dataframe
 pca <- prcomp(t(assay(vsd)))
 pca_plotting_data<-as.data.frame(pca$x)
+
+#Add the metadata to the PCA dataset
 pca_plotting_data$mate_success <- samples$mate_success
 pca_plotting_data$repo_fit <- samples$rep_fittness
 pca_plotting_data$Organ <- samples$Organ
 pca_plotting_data$Sex <- samples$Sex
 
+#Calculate the percent variation attributed to each axis 
 pcaData <- plotPCA(vsd, intgroup = c("Organ", "Sex"), returnData = TRUE, ntop = nrow(dds_FL))
-pcaData$mate_success <- samples$mate_success
-pcaData$repo_fit <- samples$rep_fittness
+percentVar <- round(100 * attr(pcaData, "percentVar"))
 
-percentVar <- round(100 * attr(pcaData, "percentVar")) # adjust this too
 
 my_colors <- c("Gill" = "#6E8B3D75", "Gonad" = "#EEB42275", "Liver" = "#EE826275")
 my_shapes <- c(16, 17)
@@ -234,10 +217,15 @@ ggplot(pca_plotting_data, aes(x=PC1, y=PC2, color = Organ, shape = Sex)) +
         panel.grid.minor = element_blank(), 
         panel.background = element_blank(), 
         axis.line = element_line(colour = "black"))
+```
 
+
+```{r pca-scaled-sex, echo=FALSE, fig.cap="The same Principal Components Analysis as above but with color now representing sex and shape representing organ type (left) as well as the comparisson of PC1 and PC3 which shows variation in expression patterns between males and females, particularly in the gonads, explains approximately 10% of the variance in gene expression data, as reflected by the third principal components axis."}
+
+par(mfrow=c(1,2))
 my_colors2 <- c("F" = "#7fc97f75", "M" = "#beaed475" )
 my_shapes2 <- c(16, 17, 15)
-ggplot(pca_plotting_data, aes(x=PC1, y=PC2, color = Sex, shape = Organ)) +
+pc1v2 <- ggplot(pca_plotting_data, aes(x=PC1, y=PC2, color = Sex, shape = Organ)) +
   scale_color_manual(values = my_colors2) +
   scale_shape_manual(values = my_shapes2) +
   geom_point(aes(size = mate_success)) +
@@ -249,7 +237,9 @@ ggplot(pca_plotting_data, aes(x=PC1, y=PC2, color = Sex, shape = Organ)) +
         panel.background = element_blank(), 
         axis.line = element_line(colour = "black"))
 
-ggplot(pca_plotting_data, aes(x=PC1, y=PC3, color = Sex, shape = Organ)) +
+pc1v2
+
+pc1v3 <- ggplot(pca_plotting_data, aes(x=PC1, y=PC3, color = Sex, shape = Organ)) +
   scale_color_manual(values = my_colors2) +
   scale_shape_manual(values = my_shapes2) +
   geom_point(aes(size = mate_success)) +
@@ -261,18 +251,13 @@ ggplot(pca_plotting_data, aes(x=PC1, y=PC3, color = Sex, shape = Organ)) +
         panel.background = element_blank(), 
         axis.line = element_line(colour = "black"))
 
-#ggplot(pcaData, aes(x=PC1, y=PC2, color = Organ, shape = Sex)) +
-#  scale_color_manual(values = my_colors) +
-#  scale_shape_manual(values = my_shapes) +
-#  geom_point(aes(size = repo_fit)) +
-#  xlab(paste0("PC1: ",percentVar[1],"% #variance")) +
-#  ylab(paste0("PC2: ",percentVar[2],"% #variance")) + 
-#  coord_fixed()
+pc1v3
+
 ```
 
 
 # Multifactor design - Comparing M v F across the diff tissue types
-If we investigate the column data of our DESeq dataset we can see that each sample has both a sex and organ type attached to it, we will be using these two factors in our multi-factor analysis
+If we investigate the column data of our DESeq dataset we can see that each sample has both a sex and organ type attached to it, we will be using these two factors in our multi-factor analysis. In this multi-factor analysis the model was run as counts ~ group, where group included both the sex and the organ type (i.e. MLiver, FLiver, etc.).
 
 ```{r multi-factor-analysis, message=FALSE, warning=FALSE}
 ##Create a copy of the DESeq dataset
@@ -286,22 +271,22 @@ design(ddsMF_FL) <- ~ group
 
 #Run the differential expression analysis
 ddsMF_FL_exp <- DESeq(ddsMF_FL)
-resultsNames(ddsMF_FL_exp)
-
+#resultsNames(ddsMF_FL_exp)
 ```
 
-## Invesitgate the results of the differential expression {.tabset}
-Thanks to the multi-factor analysis we can now explore differential expression between all of the different combinations: \  
+## Invesitgate the results of the differential expression
+Thanks to the multi-factor analysis we can now explore differential expression between all of the different combinations:
 
-  - Male Liver v. Female Liver \  
-  - Male Gill v. Female Gill \  
-  - Male Gonad v. Female Gonad \  
-  - All of the within sex tissue comparisons (e.g. Male Liver v. Male Gill, etc.) \  
+  - Male Liver v. Female Liver
+  - Male Gill v. Female Gill
+  - Male Gonad v. Female Gonad
+  - All of the within sex tissue comparisons (e.g. Male Liver v. Male Gill, etc.)
 
-### M-F Liver Comparisson {-}
+### M-F Liver Comparisson
 ```{r m-f-liver-results}
 ##Pulling out the liver M-F results with an alpha of 0.05
-liver_con_res <- results(ddsMF_FL_exp, contrast = c("group", "MLiver", "FLiver"), alpha = 0.05)
+liver_con_res <- results(ddsMF_FL_exp, contrast = c("group", "MLiver", "FLiver"),
+                         alpha = 0.05)
 liver_con_res$trin_geneid <- rownames(liver_con_res)
 head(liver_con_res)
 
@@ -318,8 +303,10 @@ liver_con_res_noNA <- liver_con_res[!is.na(liver_con_res$padj),]
 summary(liver_con_res_noNA) #We can now see that there are no outliers or low counts since the NAs have been removed
 
 #Creating a vector that contains all of the male-biased and female-biased genes in the liver
-liver_mal_biased <- liver_con_res_noNA[which(liver_con_res_noNA$log2FoldChange >= 2 & liver_con_res_noNA$padj <= 0.05),]
-liver_fem_biased <- liver_con_res_noNA[which(liver_con_res_noNA$log2FoldChange <= -2 & liver_con_res_noNA$padj <= 0.05),]
+liver_mal_biased <- liver_con_res_noNA[which(liver_con_res_noNA$log2FoldChange >= 2
+                                             & liver_con_res_noNA$padj <= 0.05),]
+liver_fem_biased <- liver_con_res_noNA[which(liver_con_res_noNA$log2FoldChange <= -2 
+                                             & liver_con_res_noNA$padj <= 0.05),]
 
 #Creating an object that contains all of the non-biased genes in the liver
 liver_non_biased <- liver_con_res_noNA[which(liver_con_res_noNA$padj > 0.05),]
@@ -334,7 +321,8 @@ liver_con_res_p05 <- liver_con_res_noNA[liver_con_res_noNA$padj <= 0.05, ]
 
 
 #Pulling the top 50 diff expressed genes in Males
-top50_MLiver_trin_genes <- cbind(rownames(head(liver_con_res_p05[order(liver_con_res_p05$log2FoldChange, decreasing = TRUE),], n=50)))
+top50_MLiver_trin_genes <- cbind(rownames(head(liver_con_res_p05[order(
+  liver_con_res_p05$log2FoldChange, decreasing = TRUE),], n=50)))
 #Run once to create the file and then commented out
 #write.table(top50_MLiver_trin_genes,
  #           'FL_maleL_top50TRgenes.txt', 
@@ -344,7 +332,8 @@ top50_MLiver_trin_genes <- cbind(rownames(head(liver_con_res_p05[order(liver_con
  #            col.names = FALSE)
 
 #Pulling the top 50 diff expressed genes in Females
-top50_Fliver_trin_genes <- cbind(rownames(head(liver_con_res_p05[order(liver_con_res_p05$log2FoldChange, decreasing = FALSE),], n=50)))
+top50_Fliver_trin_genes <- cbind(rownames(head(liver_con_res_p05[order(
+  liver_con_res_p05$log2FoldChange, decreasing = FALSE),], n=50)))
 #Run once to create the file and then commented out
 #write.table(top50_Fliver_trin_genes,
  #           'FL_femL_top50TRgenes.txt', 
@@ -355,10 +344,11 @@ top50_Fliver_trin_genes <- cbind(rownames(head(liver_con_res_p05[order(liver_con
 ```
 
 
-### M-F Gill Comparisson {-}
+### M-F Gill Comparisson
 ```{r m-f-gill}
 ##Pulling out the gill M-F results
-gill_con_res <- results(ddsMF_FL_exp, contrast = c("group", "MGill", "FGill"), alpha = 0.5)
+gill_con_res <- results(ddsMF_FL_exp, contrast = c("group", "MGill", "FGill"),
+                        alpha = 0.5)
 gill_con_res$trin_geneid <- rownames(gill_con_res)
 head(gill_con_res)
 
@@ -375,8 +365,10 @@ gill_con_res_noNA <- gill_con_res[!is.na(gill_con_res$padj), ]
 summary(gill_con_res_noNA) #We can now see that there are no outliers or low counts since the NAs have been removed
 
 #Creating a vector that contains all of the male-biased and female-biased genes in the gills
-gill_mal_biased <- gill_con_res_noNA[which(gill_con_res_noNA$log2FoldChange >= 2 & gill_con_res_noNA$padj <= 0.05),]
-gill_fem_biased <- gill_con_res_noNA[which(gill_con_res_noNA$log2FoldChange <= -2 & gill_con_res_noNA$padj <= 0.05),]
+gill_mal_biased <- gill_con_res_noNA[which(gill_con_res_noNA$log2FoldChange >= 2 
+                                           & gill_con_res_noNA$padj <= 0.05),]
+gill_fem_biased <- gill_con_res_noNA[which(gill_con_res_noNA$log2FoldChange <= -2 
+                                           & gill_con_res_noNA$padj <= 0.05),]
 
 #Creating an object that contains all of the non-biased genes in the gills, p>0.05
 gill_non_biased <- gill_con_res_noNA[which(gill_con_res_noNA$padj > 0.05),]
@@ -390,7 +382,8 @@ Here I am getting the trinity gene IDs that correspond to the top 50 differentia
 gill_con_res_p05 <- gill_con_res_noNA[gill_con_res_noNA$padj <= 0.05,]
 
 #Pulling the top 50 diff expressed genes in Males
-top50_MGill_trin_genes <- cbind(rownames(head(gill_con_res_p05[order(gill_con_res_p05$log2FoldChange, decreasing = TRUE),], n=50)))
+top50_MGill_trin_genes <- cbind(rownames(head(gill_con_res_p05[order(
+  gill_con_res_p05$log2FoldChange, decreasing = TRUE),], n=50)))
 #Run once to create the file and then commented out
 #write.table(top50_MGill_trin_genes,
  #           'FL_maleG_top50TRgenes.txt', 
@@ -400,7 +393,8 @@ top50_MGill_trin_genes <- cbind(rownames(head(gill_con_res_p05[order(gill_con_re
  #           col.names = FALSE)
 
 #Pulling the top 21 diff expressed genes in Females - Only 21 female-biased genes in the gills
-top21_FGill_trin_genes <- cbind(rownames(head(gill_con_res_p05[order(gill_con_res_p05$log2FoldChange, decreasing = FALSE),], n=21)))
+top21_FGill_trin_genes <- cbind(rownames(head(gill_con_res_p05[order(
+  gill_con_res_p05$log2FoldChange, decreasing = FALSE),], n=21)))
 #Run once to create the file and then commented out
 #write.table(top21_FGill_trin_genes,
  #           'FL_femG_top21TRgenes.txt', 
@@ -410,10 +404,11 @@ top21_FGill_trin_genes <- cbind(rownames(head(gill_con_res_p05[order(gill_con_re
  #           col.names = FALSE)
 ```
 
-### M-F Gonad Comparisson {-}
+### M-F Gonad Comparisson
 ```{r m-f-gonads}
 ##Pulling out the gonad M-F results
-gonad_con_res <- results(ddsMF_FL_exp, contrast = c("group", "MGonad", "FGonad"), alpha = 0.05)
+gonad_con_res <- results(ddsMF_FL_exp, contrast = c("group", "MGonad", "FGonad"),
+                         alpha = 0.05)
 gonad_con_res$trin_geneid <- rownames(gonad_con_res)
 head(gonad_con_res)
 
@@ -430,8 +425,10 @@ gonad_con_res_noNA <- gonad_con_res[!is.na(gonad_con_res$padj), ]
 summary(gonad_con_res_noNA) #We can now see that there are no outliers or low counts since the NAs have been removed
 
 #Creating an object that contains all of the male-biased and female-biased genes in the gonads
-gonad_mal_biased <- gonad_con_res_noNA[which(gonad_con_res_noNA$log2FoldChange >= 2 & gonad_con_res_noNA$padj <= 0.05),]
-gonad_fem_biased <- gonad_con_res_noNA[which(gonad_con_res_noNA$log2FoldChange <= -2 & gonad_con_res_noNA$padj <= 0.05),]
+gonad_mal_biased <- gonad_con_res_noNA[which(gonad_con_res_noNA$log2FoldChange >= 2 
+                                             & gonad_con_res_noNA$padj <= 0.05),]
+gonad_fem_biased <- gonad_con_res_noNA[which(gonad_con_res_noNA$log2FoldChange <= -2 
+                                             & gonad_con_res_noNA$padj <= 0.05),]
 
 #Creating an object that contains all of the non-biased genes in the gonads, p>0.05
 gonad_non_biased <- gonad_con_res_noNA[which(gonad_con_res_noNA$padj > 0.05),]
@@ -443,7 +440,8 @@ I then pulled out the trinity gene IDs that corresponded to the top 50 different
 gonad_con_res_p05 <- gonad_con_res_noNA[gonad_con_res_noNA$padj <= 0.05,]
 
 #Pulling the top 50 diff expressed genes in Males
-top50_MGonad_trin_genes <- cbind(rownames(head(gonad_con_res_p05[order(gonad_con_res_p05$log2FoldChange, decreasing = TRUE),], n=50)))
+top50_MGonad_trin_genes <- cbind(rownames(head(gonad_con_res_p05[order(
+  gonad_con_res_p05$log2FoldChange, decreasing = TRUE),], n=50)))
 #Run once to create the file and then commented out
 #write.table(top50_MGonad_trin_genes,
  #           'FL_maleGon_top50TRgenes.txt', 
@@ -453,7 +451,8 @@ top50_MGonad_trin_genes <- cbind(rownames(head(gonad_con_res_p05[order(gonad_con
  #           col.names = FALSE)
 
 #Pulling the top 50 diff expressed genes in Females
-top50_FGonad_trin_genes <- cbind(rownames(head(gonad_con_res_p05[order(gonad_con_res_p05$log2FoldChange, decreasing = FALSE),], n=50)))
+top50_FGonad_trin_genes <- cbind(rownames(head(gonad_con_res_p05[order(
+  gonad_con_res_p05$log2FoldChange, decreasing = FALSE),], n=50)))
 #Run once to create the file and then commented out
 #write.table(top50_FGonad_trin_genes,
  #           'FL_femGon_top50TRgenes.txt', 
@@ -463,8 +462,8 @@ top50_FGonad_trin_genes <- cbind(rownames(head(gonad_con_res_p05[order(gonad_con
  #           col.names = FALSE)
 ```
 
-### MA Plots {-}
-```{r MA-plot-MF, echo=FALSE, fig.height= 20}
+### MA Plots
+```{r MA-plot-MF, echo=FALSE, fig.height= 15, fig.width=8, fig.cap="MA-plots generated for each organ type that compares logFC to the mean expression. Female-biased and Male-biased genes are represented by color (green and purple correspondingly) and are determing with a fc cutoff of 2 and a p-value cutoff of 0.05."}
 liver_MA <- ggmaplot(liver_con_res,
          fdr = 0.05, fc = 2,
          size = 1.4,
@@ -510,8 +509,10 @@ plot_grid(liver_MA, gill_MA, gonad_MA,
 
 ```
 
+From the MA plots we can see the highest number of biased genes are found in the gonads (Fig. \@ref(fig:MA-plot-MF)) and then the liver and lastly the gills. The liver appears to be the only organ where there are more female-biased genes than male-biased genes, which is initially surprising due to the sex-role-reversed nature of these fish.
+
 ## Creating an Upset Plot
-```{r upset-plot, echo=FALSE}
+```{r upset-plot-mal, echo=FALSE, fig.cap="Upset plots to show the number of shared sex-biased genes across the organs in males."}
 #Male-biased genes
 listInputMB <- list("Testis" = rownames(gonad_mal_biased),
                   "Male Gill"=rownames(gill_mal_biased), 
@@ -521,7 +522,9 @@ upset(fromList(listInputMB),
       mainbar.y.label = "Number of Shared Male-Biased Genes",
       sets.x.label = "Total Number of Male-Biased Genes",
       point.size = 3)
+```
 
+```{r upset-plot-fem, echo=FALSE, fig.cap="Upset plots to show the number of shared sex-biased genes across the organs in females."}
 #Female
 listInputFB <- list("Ovaries" = rownames(gonad_fem_biased),
                   "Female Gill"=rownames(gill_fem_biased), 
@@ -531,7 +534,22 @@ upset(fromList(listInputFB),
       mainbar.y.label = "Number of Shared Female-Biased Genes",
       sets.x.label = "Total Number of Female-Biased Genes",
       point.size = 3)
+```
 
+```{r upset-plot-all, echo=FALSE, fig.cap="Upset plots to show the number of shared sex-biased genes across the organs across both sexes."}
+write.table(as.data.frame(gonad_mal_biased), "gonad_mal_biased.txt", row.names = TRUE)
+write.table(as.data.frame(gonad_fem_biased), "gonad_fem_biased.txt", row.names = TRUE)
+write.table(as.data.frame(gill_mal_biased), "gill_mal_biased.txt", row.names = TRUE)
+write.table(as.data.frame(gill_fem_biased), "gill_fem_biased.txt", row.names = TRUE)
+write.table(as.data.frame(liver_mal_biased), "liver_mal_biased.txt", row.names = TRUE)
+write.table(as.data.frame(liver_fem_biased), "liver_fem_biased.txt", row.names = TRUE)
+
+gonad_mal_biased <- read.table("data/gonad_mal_biased.txt", row.names = 1)
+gonad_fem_biased <- read.table("data/gonad_fem_biased.txt", row.names = 1)
+gill_mal_biased <- read.table("data/gill_mal_biased.txt", row.names = 1)
+gill_fem_biased <- read.table("data/gill_fem_biased.txt", row.names = 1)
+liver_mal_biased <- read.table("data/liver_mal_biased.txt", row.names = 1)
+liver_fem_biased <- read.table("data/liver_fem_biased.txt", row.names = 1)
 #Checking there is no overlap between the two sexes
 listInputall <- list("Testis" = rownames(gonad_mal_biased),
                   "Male Gill"=rownames(gill_mal_biased), 
@@ -545,7 +563,10 @@ upset(fromList(listInputall),
       point.size = 3,
       nsets = 6,
       nintersects = NA)
+
 ```
+
+In both males and females the highest number of shared sex-biased genes is found between the gonads and the liver (Fig. \@ref(fig:upset-plot-mal), \@ref(fig:upset-plot-fem)). There are no genes that are shared across the same organ between males and females (i.e. biased in males and females in the liver) which is good (Fig. \@ref(fig:upset-plot-all)). No sex-biased genes are female-biased in all organs, although six genes are male-biased in all three organs (Fig. \@ref(fig:upset-plot-mal), \@ref(fig:upset-plot-fem)).
 
 ## Variation in FC across sex-bias and tissue type
 I want to create a plot the highlights the variation we see in fold-change both across the different biases groups (male-biased, female-biased, and non-biased) within one tissue type and across all of the tissue types. To do this I first need to create a "long" dataset in the following format:
@@ -584,13 +605,13 @@ logFC_long<- data.frame(
          ),
   bias=c(rep("FB",nrow(gill_fem_biased)),
          rep("MB",nrow(gill_mal_biased)),
-         rep("NB", nrow(gill_non_biased)),
+         rep("UB", nrow(gill_non_biased)),
          rep("FB", nrow(gonad_fem_biased)),
          rep("MB", nrow(gonad_mal_biased)),
-         rep("NB", nrow(gonad_non_biased)),
+         rep("UB", nrow(gonad_non_biased)),
          rep("FB", nrow(liver_fem_biased)),
          rep("MB", nrow(liver_mal_biased)),
-         rep("NB", nrow(liver_non_biased))
+         rep("UB", nrow(liver_non_biased))
          ),
   logFC=c(gill_fem_biased$log2FoldChange,
           gill_mal_biased$log2FoldChange,
@@ -614,34 +635,34 @@ logFC_long<- data.frame(
            )
   
 )
+
+write.csv(logFC_long, "data/logFC_long_sexbias.csv", row.names = FALSE)
 ```
 
 With the dataset in the proper format now, we can generate the plot
-```{r FC-var-plot, echo=FALSE}
-#ggplot(logFC_long,
-       #aes(x = tissue, y = abs(logFC), fill = bias)) +
-  #geom_boxplot() +
-  #geom_jitter(color="black", size=0.4, alpha=0.9) +
-  #theme_minimal()
+```{r FC-var-plot, echo=FALSE, fig.cap="Absolute value of the logFC for genes that are female-biased, male-biased, and unbiased across each tissue type. Raw fold-change values are added ontop of the boxplot as jitters."}
+my_colors <- c("FB" = "#7fc97f", "MB" = "#beaed4", "UB" = "darkgray")
 
-my_colors <- c("FB" = "#7fc97f", "MB" = "#beaed4", "NB" = "darkgray")
-
-ggplot(logFC_long,
+logFCvbias <- ggplot(logFC_long,
        aes(x = bias, y = abs(logFC), fill = bias)) +
   geom_boxplot() +
   scale_fill_manual(values = my_colors) +
   facet_grid(. ~ tissue) +
-  theme_minimal() +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black")) +
   geom_point(data=logFC_long, aes(x=bias, y=abs(logFC)),
              size=0.4, 
              position = position_jitter(width = 0.15)) + 
   labs(x="Bias Level", y="|logFC|") +
   guides(fill = guide_legend(title = "Bias Level", order = 3))
-  #scale_fill_discrete(labels=c('Female-Biased', 'Male-Biased', 'Non-Biased'))
-  #geom_jitter(color="black", size=0.4, alpha=0.9)
+
+logFCvbias
 ```
 
-There appears to be differences in the logFC across both the organs and the sex-bias groups (male-biased, fem-biased, and non-biased). Let's explore some analyses to see if we can put some statistical power behind those differences.
+There appears to be differences in the logFC across both the organs and the sex-bias groups (male-biased, fem-biased, and non-biased) (Fig. \@ref(fig:FC-var-plot)). Let's explore some analyses to see if we can put some statistical power behind those differences.
+
 ```{r FC-var-stats, warning=FALSE}
 #Looking at some summary statistics for logFC between the different groups
 tapply(abs(logFC_long$logFC), list(logFC_long$bias, logFC_long$tissue), mean)
@@ -668,6 +689,10 @@ hist(resid(fc_var_aov))
 plot(TukeyHSD(fc_var_aov))
 library(multcompView)
 multcompLetters4(fc_var_aov, TukeyHSD(fc_var_aov))
+
+##Fitting a negative binomial model
+library(MASS)
+model <- glm.nb(abs(logFC_long$logFC) ~ logFC_long$tissue * logFC_long$bias)
 ```
 
 
@@ -686,10 +711,13 @@ for(organ in organs){
   
   #Male-Specific Genes
   ##Pull out all of the rows where fem count = 0
-  fem0_organ <- assay(dds_FL)[rowSums(assay(dds_FL)[, dds_FL$Sex == "F" & dds_FL$Organ==organ]) < 1, dds_FL$Organ == organ]
+  fem0_organ <- assay(dds_FL)[rowSums(assay(dds_FL)[, dds_FL$Sex == "F" 
+                                                    & dds_FL$Organ==organ]) < 1,
+                              dds_FL$Organ == organ]
   
   ##Pull out rows where median of male count >=10 for that organ
-  mal10_organ <- apply(assay(dds_FL)[, dds_FL$Sex == "M" & dds_FL$Organ == organ],
+  mal10_organ <- apply(assay(dds_FL)[, dds_FL$Sex == "M" 
+                                     & dds_FL$Organ == organ],
                        1,
                        function(x) median(x) >=10)
   
@@ -704,7 +732,9 @@ for(organ in organs){
   
   #Female-Specific Genes
   ##Pull out all of the rows where male count = 0
-  mal0_organ <- assay(dds_FL)[rowSums(assay(dds_FL)[, dds_FL$Sex == "M" & dds_FL$Organ==organ]) < 1, dds_FL$Organ == organ]
+  mal0_organ <- assay(dds_FL)[rowSums(assay(dds_FL)[, dds_FL$Sex == "M" 
+                                                    & dds_FL$Organ==organ]) < 1,
+                              dds_FL$Organ == organ]
   
   ##Pull out rows where median of female count >=10 for that organ
   fem10_organ <- apply(assay(dds_FL)[, dds_FL$Sex == "F" & dds_FL$Organ == organ],
@@ -773,7 +803,7 @@ for(gene in gill_fem_biased_geneIDS){
 ```
 
 ## Creating categories and binning the sex-biased genes based on degree of logFC
-This binned was only done on the sex-biased genes, will not have a category for the unbiased genes. The cutoffs for the different groups are as follows:  \
+This binned was only done on the sex-biased genes, will not have a category for the unbiased genes. The cutoffs for the different groups are as follows:
 
     1. Low - biased = LFC 2 - 3
     2. Medium - biased = LFC 3 - 5
@@ -784,15 +814,17 @@ Counts of the sex-specific genes will be added on separately as they were not cl
 
 ```{r bin-sex-bias}
 #Create  subset of our long dataset that does not include the non-biased genes
-logFC_long_noNB <- logFC_long[logFC_long$bias != "NB",]
+logFC_long_noNB <- logFC_long[logFC_long$bias != "UB",]
 
 #Make a vector that contains all of the groupings
-biased_bins <- c("low", "med", "high", "extreme", "sex-specific")
+biased_bins <- c("Low", "Med", "High", "Extreme", "Sex-specific")
 
 #Create a new column in the dataset and use ifelse statements to set the category limits
 #abs(logFC) was used to account for the fem-biased genes possessing negative values
-logFC_long_noNB$bias_cat <- ifelse(abs(logFC_long_noNB$logFC) >= 2 & abs(logFC_long_noNB$logFC) < 3, biased_bins[1],
-                                   ifelse(abs(logFC_long_noNB$logFC) >= 3 & abs(logFC_long_noNB$logFC) < 5, biased_bins[2],
+logFC_long_noNB$bias_cat <- ifelse(abs(logFC_long_noNB$logFC) >= 2 & abs(logFC_long_noNB$logFC) < 3, 
+                                   biased_bins[1],
+                                   ifelse(abs(logFC_long_noNB$logFC) >= 3 & abs(logFC_long_noNB$logFC) < 5, 
+                                          biased_bins[2],
                                           ifelse(abs(logFC_long_noNB$logFC) >= 5 & abs(logFC_long_noNB$logFC) < 10,
                                                  biased_bins[3], 
                                                  biased_bins[4])
@@ -803,27 +835,37 @@ logFC_long_noNB$bias_cat <- ifelse(abs(logFC_long_noNB$logFC) >= 2 & abs(logFC_l
 bias_cat_table <- table(logFC_long_noNB$bias, logFC_long_noNB$bias_cat, logFC_long_noNB$tissue)
 
 #Add the counts of sex-specific genes to the table
-bias_cat_gill <- cbind(bias_cat_table[,, "Gill"], "sex-specific" = c(nrow(FL_sex_specific_genes$Gill_female_specific), nrow(FL_sex_specific_genes$Gill_male_specific)))
-bias_cat_gonad <- cbind(bias_cat_table[,, "Gonad"], "sex-specific" = c(nrow(FL_sex_specific_genes$Gonad_female_specific), nrow(FL_sex_specific_genes$Gonad_male_specific)))
-bias_cat_liver <- cbind(bias_cat_table[,, "Liver"], "sex-specific" = c(nrow(FL_sex_specific_genes$Liver_female_specific), nrow(FL_sex_specific_genes$Liver_male_specific)))
+bias_cat_gill <- cbind(bias_cat_table[,, "Gill"], 
+                       "Sex-specific" = c(nrow(FL_sex_specific_genes$Gill_female_specific), nrow(FL_sex_specific_genes$Gill_male_specific)))
+write.table(bias_cat_gill, "data/bias_cat_gills.txt", row.names = TRUE)
+
+bias_cat_gonad <- cbind(bias_cat_table[,, "Gonad"], 
+                        "Sex-specific" = c(nrow(FL_sex_specific_genes$Gonad_female_specific), nrow(FL_sex_specific_genes$Gonad_male_specific)))
+write.table(bias_cat_gonad, "data/bias_cat_gonad.txt", row.names = TRUE)
+
+bias_cat_liver <- cbind(bias_cat_table[,, "Liver"], "Sex-specific" = c(nrow(FL_sex_specific_genes$Liver_female_specific), nrow(FL_sex_specific_genes$Liver_male_specific)))
+write.table(bias_cat_liver, "data/bias_cat_liver.txt", row.names = TRUE)
 
 #Plot the counts for each tissue type
 par(mfrow=c(1, 3))
 barplot(bias_cat_gill[,biased_bins], beside = TRUE, ylim = c(0, max(bias_cat_table) + 1), col = c("#7fc97f", "#beaed4"),
-        main = "Gill")
+        main = "Gill", ylab = "Number of Genes", xlab = "Bias Category")
 barplot(bias_cat_gonad[,biased_bins], beside = TRUE, ylim = c(0, max(bias_cat_table) + 1), col = c("#7fc97f", "#beaed4"),
         main = "Gonad")
 barplot(bias_cat_liver[,biased_bins], beside = TRUE, ylim = c(0, max(bias_cat_table) + 1), col = c("#7fc97f", "#beaed4"),
         main = "Liver")
 legend("topright", legend = c("Female-biased", "Male-biased"), fill = c("#7fc97f", "#beaed4"))
+
+
+
 ```
 
 
 ## Gene Ontology Analysis
-We wanted to figure out two things: \  
+We wanted to figure out two things:   
 
-  1) What are the genes that are sex-biased within each tissue type \  
-  2) What are the GO terms for those genes. \  
+  1) What are the genes that are sex-biased within each tissue type   
+  2) What are the GO terms for those genes.   
 
 To accomplish this I first had to pull out the sequences that corresponded to the Trinity gene IDS pulled out above. Once those sequences were fetched they were blasted against the _Syngnathus scovelli_ genome. This was completed with the following bash script on the RCC. 
 
@@ -856,10 +898,24 @@ FL_blast_list <- list()
 #Create a loop to read in all of the blast results
 for(file_name in FL_blast_files){
   # Read the file and store it in a new object
-  file_data <- read.delim(file.path(blast_path, file_name), stringsAsFactors = FALSE, quote = "", sep = "\t", header = FALSE)
+  file_data <- read.delim(file.path(blast_path, file_name), 
+                          stringsAsFactors = FALSE, 
+                          quote = "", 
+                          sep = "\t",
+                          header = FALSE)
   
   #Add column names to the dataset
-  colnames(file_data) <- c("trin_geneid", "trin_gene_start", "trin_gene_end", "scov_gene_info", "scov_gene_start", "scov_gene_end", "evalue", "bit_score", "length", "pident", "gaps")
+  colnames(file_data) <- c("trin_geneid", 
+                           "trin_gene_start", 
+                           "trin_gene_end", 
+                           "scov_gene_info", 
+                           "scov_gene_start
+                           scov_gene_end", 
+                           "evalue", 
+                           "bit_score", 
+                           "length", 
+                           "pident", 
+                           "gaps")
   
   # Create a new object with a name based on the file name
   blast_name <- sub(".txt$", "", file_name) #Removes the file extension
@@ -1015,13 +1071,18 @@ FL_blast_list <- list()
 #Create a loop to read in all of the blast results
 for(file_name in FL_blast_files){
   # Read the file and store it in a new object
-  file_data <- read.delim(file.path(blast_path, file_name), stringsAsFactors = FALSE, quote = "", sep = "\t", header = FALSE)
+  file_data <- read.delim(file.path(blast_path, file_name), 
+                          stringsAsFactors = FALSE, quote = "", 
+                          sep = "\t", header = FALSE)
 
   #Get rid of the columns we don't need
   file_data <- file_data[,c(1:4,8,10:16)]
   
   #Add column names to the dataset
-  colnames(file_data) <- c("trin_geneid", "trin_gene_start", "trin_gene_end", "reiro_prot_info", "prot_id", "reiro_prot_start", "reiro_prot_end", "evalue", "bit_score", "length", "pident", "gaps")
+  colnames(file_data) <- c("trin_geneid", "trin_gene_start", "trin_gene_end",
+                           "reiro_prot_info", "prot_id", "reiro_prot_start",
+                           "reiro_prot_end", "evalue", "bit_score", "length",
+                           "pident", "gaps")
   
   # Create a new object with a name based on the file name
   blast_name <- sub(".txt$", "", file_name) #Removes the file extension
@@ -1039,7 +1100,10 @@ blast_output_filtered <- lapply(FL_blast_list, function(data_frame){
   
   #Create an empty dataframe to store intermediate results in
   output <- data.frame(matrix(data = NA, ncol = ncol(data_frame), nrow = 0))
-  colnames(output) <- c("trin_geneid", "trin_gene_start", "trin_gene_end", "reiro_prot_info", "prot_id", "reiro_prot_start", "reiro_prot_end", "evalue", "bit_score", "length", "pident", "gaps")
+  colnames(output) <- c("trin_geneid", "trin_gene_start", "trin_gene_end",
+                        "reiro_prot_info", "prot_id", "reiro_prot_start",
+                        "reiro_prot_end", "evalue", "bit_score", "length", 
+                        "pident", "gaps")
   
   #Generate a for loop that pulls out the lowest e-value + highest % identity for each gene
   for(gene in uniqueID$trin_geneid){
@@ -1047,17 +1111,20 @@ blast_output_filtered <- lapply(FL_blast_list, function(data_frame){
     #Subset the dataset for each Trinity gene
     this_trin_gene<- subset(data_frame, trin_geneid==gene)
     #Pull out gene with smallest e-value
-    uni_gene_subset_lowe <- this_trin_gene[which(this_trin_gene$evalue == min(this_trin_gene$evalue)),]
+    uni_gene_subset_lowe <- this_trin_gene[which(this_trin_gene$evalue ==
+                                                   min(this_trin_gene$evalue)),]
     #In case mult. genes have same e-value, pull out gene with highest % identity
-    uni_gene_subset_lowe_highpid <- uni_gene_subset_lowe[which(uni_gene_subset_lowe$pident == max(uni_gene_subset_lowe$pident)),]
+    uni_gene_subset_lowe_highpid <- uni_gene_subset_lowe[
+      which(uni_gene_subset_lowe$pident == 
+              max(uni_gene_subset_lowe$pident)),
+      ]
     
     # keep only one of multiple identical rows
     uni_gene_subset_lowe_highpid <- unique(uni_gene_subset_lowe_highpid)
 
-    # check that there is a single gene ID in scovelli, if not, only first row is kept
-    if(length(gsub("^.*(GeneID:\\d+)\\].*$","\\1",uni_gene_subset_lowe_highpid$reiro_prot_info))>1){
-    #   browser()
-    # } else{
+    # check that there is a single gene ID, if not, only first row is kept
+    if(length(gsub("^.*(GeneID:\\d+)\\].*$","\\1",
+                   uni_gene_subset_lowe_highpid$reiro_prot_info))>1){
       uni_gene_subset_lowe_highpid<-uni_gene_subset_lowe_highpid[1,]
     }
     
@@ -1086,8 +1153,10 @@ colnames(reiro_gff) <- c("seqname", "source", "feature", "start", "end", "gene_i
 genes <- reiro_gff[reiro_gff$feature == "CDS",]
 
 #Pull out the gene name that corresponds to each protein ID
-genes$gene_name <- gsub("^(.*;)(gene=)(\\w+\\d*);(.*$)", "\\3", genes$gene_info)
-genes$prot_id <- gsub("^(.*;)(protein_id=)(.*)$", "\\3", genes$gene_info)
+genes$gene_name <- gsub("^(.*;)(gene=)(\\w+\\d*);(.*$)", "\\3", 
+                        genes$gene_info)
+genes$prot_id <- gsub("^(.*;)(protein_id=)(.*)$", "\\3", 
+                      genes$gene_info)
 
 #Merge the gene names pulled out above with the rest of the BLAST datasets based on the proteinID
 blast_output_merged <- lapply(blast_output_filtered, function(dataframe){
@@ -1116,22 +1185,146 @@ blast_output_merged$FL_malL_biased_TRgenes_blast <- merge(as.data.frame(liver_ma
 
 
 ```{r, eval=FALSE}
-write.table(c(blast_output_merged$FL_femG_biased_TRgenes_blast$gene_name, blast_output_merged$FL_femGon_biased_TRgenes_blast$gene_name, blast_output_merged$FL_femL_biased_TRgenes_blast$gene_name, blast_output_merged$FL_malG_biased_TRgenes_blast$gene_name, blast_output_merged$FL_malGon_biased_TRgenes_blast$gene_name, blast_output_merged$FL_malL_biased_TRgenes_blast$gene_name),
+write.table(c(blast_output_merged$FL_femG_biased_TRgenes_blast$gene_name,
+              blast_output_merged$FL_femGon_biased_TRgenes_blast$gene_name,
+              blast_output_merged$FL_femL_biased_TRgenes_blast$gene_name,
+              blast_output_merged$FL_malG_biased_TRgenes_blast$gene_name,
+              blast_output_merged$FL_malGon_biased_TRgenes_blast$gene_name,
+              blast_output_merged$FL_malL_biased_TRgenes_blast$gene_name),
            'FL_GOnames.txt', 
             sep = " ", 
             quote=FALSE, 
             row.names = FALSE, 
             col.names = FALSE)
 
-write.table(rbind(blast_output_merged$FL_femG_biased_TRgenes_blast[,c("gene_name", "log2FoldChange")],
-              blast_output_merged$FL_femGon_biased_TRgenes_blast[,c("gene_name", "log2FoldChange")],
-              blast_output_merged$FL_femL_biased_TRgenes_blast[,c("gene_name", "log2FoldChange")],
-              blast_output_merged$FL_malG_biased_TRgenes_blast[,c("gene_name", "log2FoldChange")],
-              blast_output_merged$FL_malGon_biased_TRgenes_blast[,c("gene_name", "log2FoldChange")],
-              blast_output_merged$FL_malL_biased_TRgenes_blast[,c("gene_name", "log2FoldChange")]),
+write.table(rbind(blast_output_merged$FL_femG_biased_TRgenes_blast
+                  [,c("gene_name", "log2FoldChange")],
+              blast_output_merged$FL_femGon_biased_TRgenes_blast
+              [,c("gene_name", "log2FoldChange")],
+              blast_output_merged$FL_femL_biased_TRgenes_blast
+              [,c("gene_name", "log2FoldChange")],
+              blast_output_merged$FL_malG_biased_TRgenes_blast
+              [,c("gene_name", "log2FoldChange")],
+              blast_output_merged$FL_malGon_biased_TRgenes_blast
+              [,c("gene_name", "log2FoldChange")],
+              blast_output_merged$FL_malL_biased_TRgenes_blast
+              [,c("gene_name", "log2FoldChange")]),
             'FL_GOnames_FC.txt',
             sep = "\t",
             quote = FALSE,
             row.names = FALSE,
             col.names = FALSE)
 ```
+
+```{r panther-results}
+panther <- read.delim("data/pantherGeneList.txt", header = FALSE)
+colnames(panther) <- c("GeneID", "MappedID", "GeneName", "pantherFAM", 
+                       "panther_prot_class", "species")
+
+blast_output_merged$FL_femG_biased_TRgenes_blast <-
+  merge(blast_output_merged$FL_femG_biased_TRgenes_blast, 
+        panther[, c(2,5)], 
+        by.x = "gene_name", 
+        by.y = "MappedID", 
+        all.x = TRUE)
+blast_output_merged$FL_femGon_biased_TRgenes_blast <-
+  merge(blast_output_merged$FL_femGon_biased_TRgenes_blast, 
+        panther[, c(2,5)], 
+        by.x = "gene_name", 
+        by.y = "MappedID", 
+        all.x = TRUE)
+blast_output_merged$FL_femL_biased_TRgenes_blast <-
+  merge(blast_output_merged$FL_femL_biased_TRgenes_blast, 
+        panther[, c(2,5)], 
+        by.x = "gene_name", 
+        by.y = "MappedID", 
+        all.x = TRUE)
+blast_output_merged$FL_malG_biased_TRgenes_blast <-
+  merge(blast_output_merged$FL_malG_biased_TRgenes_blast, 
+        panther[, c(2,5)], 
+        by.x = "gene_name", 
+        by.y = "MappedID", 
+        all.x = TRUE)
+blast_output_merged$FL_malGon_biased_TRgenes_blast <-
+  merge(blast_output_merged$FL_malGon_biased_TRgenes_blast, 
+        panther[, c(2,5)], 
+        by.x = "gene_name", 
+        by.y = "MappedID", 
+        all.x = TRUE)
+blast_output_merged$FL_malL_biased_TRgenes_blast <-
+  merge(blast_output_merged$FL_malL_biased_TRgenes_blast, 
+        panther[, c(2,5)], 
+        by.x = "gene_name", 
+        by.y = "MappedID", 
+        all.x = TRUE)
+```
+
+```{r}
+go_tabs <- lapply(blast_output_merged, function(dat){
+
+  tab <- data.frame(table(dat$panther_prot_class) )
+  tab$Var1[tab$Var1==""] <- NA
+  tab$prop <- tab$Freq/sum(tab$Freq)
+
+  return(tab)
+  })
+
+
+all_go_dat <- data.frame(matrix(ncol=5,nrow=0))
+colnames(all_go_dat) <- c(
+  colnames(go_tabs$FL_femG_biased_TRgenes_blast),
+  "bias_cat", "tissue"
+)
+tissues <- c("Gill", "Gonad", "Liver", "Gill", "Gonad", "Liver")
+
+for(i in 1:length(go_tabs)){
+  tmp<-go_tabs[[i]]
+  tmp$cat<-names(go_tabs)[i]
+  tmp$tissue <- tissues[[i]]
+  all_go_dat<-rbind(all_go_dat, tmp)
+}
+
+all_go_dat$freq_organ <- 0
+length(unique(all_go_dat[all_go_dat$tissue == "Gill",]$Var1))
+
+# make a barplot somehow
+my_colors <- c("Gonad" = "#EEB422", "Liver" = "#EE8262", "Gill" = "#20B2AA")
+ggplot(all_go_dat, 
+       aes(Var1, prop, fill = tissue)) +   
+  geom_bar(position = "dodge", stat="identity") +
+  scale_fill_manual(values = my_colors) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black"),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+
+# Generating the Figures
+```{r fig-1, warning=FALSE}
+plot_grid(pc1v2, pc1v3,
+          nrow = 1,
+          align = "h",
+          labels = c("A", "B"))
+
+```
+
+```{r fig-2, fig.height=11, fig.width=7}
+p1 <- ggdraw() + draw_image("imgs/FCvbiasFL.png")
+p2 <- ggdraw() + draw_image("imgs/bias_bins_FL.png")
+p3 <- ggdraw() + draw_image("imgs/FL_upsetall.png")
+plot_grid(p1,
+          NULL,
+          p2,
+          NULL,
+          p3,
+          ncol = 1,
+          align = "v",
+          labels = c('(a)',"", "(b)","", "(c)"),
+          #hjust = -3,
+          rel_heights = c(5, 0.2, 4, 0.2, 6))
+
+
+```
+
