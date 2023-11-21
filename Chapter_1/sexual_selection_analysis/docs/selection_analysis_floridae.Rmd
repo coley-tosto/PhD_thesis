@@ -286,7 +286,7 @@ wilcox.test(fem_succ$svl ~ fem_succ$mated)
 wilcox.test(fem_succ$weight ~ fem_succ$mated)
 ```
 
-# Mate success versus Reproductive success
+# Mate success versus Reproductive success (Bateman Gradient)
 I now want to look at any relationship that may exist between mating success and reproductive success for males and females. The Bateman gradient will be calculated, which is the slope of the weighted least-squares regression of relative reproductive success (number of offspring divided by the mean) on mating success.
 
 ```{r, echo=FALSE, fig.cap="Relationship between reproductive success and mating success for male (purple) and female (green) _Syngnathus floridae_. Reproductive success is shown as relative fitness (i.e. number of offspring produced divided by the mean number of offspring produced). Bateman's gradient is shown as the weighted least-squares regression line (dashed) for males and females.", fig.height=5}
@@ -336,3 +336,165 @@ summary(wls_model_fem)
 summary(wls_model_mal)
 ```
 
+```{r}
+mal_succ$prop_surviving <- ifelse(mal_succ$totalEggs == 0, 0,
+                                  mal_succ$NumDeveloped_Calc/mal_succ$totalEggs)
+fem_succ$prop_surviving <- ifelse(fem_succ$totalEggs == 0, 0,
+                                  fem_succ$NumDeveloped/fem_succ$totalEggs)
+
+plot(fem_succ$MatingSuccess[fem_succ$totalEggs != 0],
+     fem_succ$prop_surviving[fem_succ$totalEggs != 0],
+     xlab = "Number of Mates (mating success)",
+     ylab = "Proportion of Surviving Offpring",
+     pch = 19,
+     col = "#7fc97f75")
+points(mal_succ$MatingSuccess[mal_succ$totalEggs != 0],
+       mal_succ$prop_surviving[mal_succ$totalEggs != 0],
+       xlab = "Number of Mates (mating success)",
+       ylab = "Proportion of Surviving Offpring",
+       pch = 19,
+       col = "#beaed475")
+abline(lm(fem_succ$prop_surviving[fem_succ$totalEggs != 0] ~
+            fem_succ$MatingSuccess[fem_succ$totalEggs != 0]),
+       col = "#7fc97f", lwd = 3, lty = 2)
+abline(lm(mal_succ$prop_surviving[mal_succ$totalEggs != 0] ~
+            mal_succ$MatingSuccess[mal_succ$totalEggs != 0]),
+       col = "#beaed4", lwd = 3, lty = 2)
+
+
+plot(fem_succ$MatingSuccess,
+     fem_succ$prop_surviving,
+     xlab = "Number of Mates (mating success)",
+     ylab = "Proportion of Surviving Offpring",
+     pch = 19,
+     col = "#7fc97f75")
+points(mal_succ$MatingSuccess,
+       mal_succ$prop_surviving,
+       xlab = "Number of Mates (mating success)",
+       ylab = "Proportion of Surviving Offpring",
+       pch = 19,
+       col = "#beaed475")
+abline(lm(fem_succ$prop_surviving ~
+            fem_succ$MatingSuccess),
+       col = "#7fc97f", lwd = 3, lty = 2)
+abline(lm(mal_succ$prop_surviving ~
+            mal_succ$MatingSuccess),
+       col = "#beaed4", lwd = 3, lty = 2)
+```
+
+
+# Episodes of Selection
+
+# Generating the figures
+```{r fig-6v1}
+bateman <- ggplot(data = fem_succ, aes(x = MatingSuccess, y = relative_fit)) +
+  geom_point(color = "#7fc97f75",
+             size = 3) +
+  geom_point(data = mal_succ,
+             color = "#beaed475",
+             size = 3) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black")) +
+  geom_smooth(method = "lm", 
+              mapping = aes(weight = wt_fem, color = "Female"), 
+              se = FALSE, lty = 2) +
+  geom_smooth(data = mal_succ, method = "lm", 
+              mapping = aes(weight = wt_mal, color = "Male"), 
+              fullrange = TRUE, se = FALSE, lty = 2) +
+  labs(x="Number of Mates (mating success)",
+       y="Relative Fitness (reproductive success)") +
+  scale_color_manual(name='Sex',
+                     breaks=c('Female', 'Male'),
+                     values=c('Female'='#7fc97f', 'Male'='#beaed4'))
+
+
+prop_offspring <- ggplot(fem_succ, aes(x = MatingSuccess, y = prop_surviving)) +
+  geom_point(color = "#7fc97f75", 
+             size = 3) +
+  geom_point(data = mal_succ, 
+             color = "#beaed475", 
+             size = 3) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black")) +
+  geom_smooth(method = "lm", 
+              aes(color = "Female"), 
+              se = FALSE, lty = 2, 
+              fullrange=TRUE) +
+  geom_smooth(data = mal_succ, 
+              method = "lm", 
+              aes(color = "Male"), 
+              se = FALSE, lty = 2, 
+              fullrange = TRUE) +
+  labs(x="Number of Mates (mating success)", 
+       y="Proportion of Surviving Offpring") +
+  scale_color_manual(name='Sex',
+                     breaks=c('Female', 'Male'),
+                     values=c('Female'='#7fc97f', 'Male'='#beaed4'))
+
+plot_grid(bateman, prop_offspring,
+          nrow = 1,
+          align = 'h',
+          labels = c("A", "B"))
+```
+
+```{r fig-6v2}
+bateman <- ggplot(data = fem_succ, aes(x = MatingSuccess, y = relative_fit)) +
+  geom_point(color = "#7fc97f75",
+             size = 3) +
+  geom_point(data = mal_succ,
+             color = "#beaed475",
+             size = 3,
+             aes(x=as.numeric(MatingSuccess)+0.05, y=relative_fit)) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black")) +
+  geom_smooth(method = "lm", 
+              mapping = aes(weight = wt_fem, color = "Female"), 
+              se = FALSE, lty = 2) +
+  geom_smooth(data = mal_succ, method = "lm", 
+              mapping = aes(weight = wt_mal, color = "Male"), 
+              fullrange = TRUE, se = FALSE, lty = 2) +
+  labs(x="Number of Mates (mating success)",
+       y="Relative Fitness (reproductive success)") +
+  scale_color_manual(name='Sex',
+                     breaks=c('Female', 'Male'),
+                     values=c('Female'='#7fc97f', 'Male'='#beaed4'))
+
+
+prop_offspring_no0 <- ggplot(fem_succ[fem_succ$totalEggs != 0,], 
+                             aes(x = MatingSuccess, y = prop_surviving)) +
+  geom_point(color = "#7fc97f75", 
+             size = 3) +
+  geom_point(data = mal_succ[mal_succ$totalEggs != 0,], 
+             color = "#beaed475", 
+             size = 3,
+             aes(x=as.numeric(MatingSuccess)+0.05, y=prop_surviving)) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black")) +
+  geom_smooth(method = "lm", 
+              aes(color = "Female"), 
+              se = FALSE, lty = 2, 
+              fullrange=TRUE) +
+  geom_smooth(data = mal_succ[mal_succ$totalEggs != 0,], 
+              method = "lm", 
+              aes(color = "Male"), 
+              se = FALSE, lty = 2, 
+              fullrange = TRUE) +
+  labs(x="Number of Mates (mating success)", 
+       y="Proportion of Surviving Offpring") +
+  scale_color_manual(name='Sex',
+                     breaks=c('Female', 'Male'),
+                     values=c('Female'='#7fc97f', 'Male'='#beaed4'))
+
+plot_grid(bateman, prop_offspring_no0,
+          nrow = 1,
+          align = 'h',
+          labels = c("A", "B"))
+```
