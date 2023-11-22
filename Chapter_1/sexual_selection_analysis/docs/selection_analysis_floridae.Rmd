@@ -87,7 +87,7 @@ fem_succ[,11:14] <- sapply(fem_succ[,11:14],
                              ifelse(is.na(x), 0, x))
 
 #Add a column for females to denote mated or unmated
-fem_succ$mated <- ifelse(fem_succ$MatingSuccess > 0, paste0(1), paste0(0))
+fem_succ$mated <- ifelse(fem_succ$MatingSuccess > 0, 1, 0)
 
 ```
 
@@ -383,7 +383,211 @@ abline(lm(mal_succ$prop_surviving ~
 ```
 
 
-# Episodes of Selection
+# Episode of Sexual Selection
+## Partitioning the Total Opportunity for Selection (I)
+```{r opp-selection-females}
+#Create a dataframe to store all of the intermediate values of fitness in
+fem_succ_fitness <- data.frame(matrix(ncol = ncol(fem_succ) + 9,
+                                      nrow = 0))
+colnames(fem_succ_fitness) <- c(colnames(fem_succ),
+                                "w1", "w1_squared",
+                                "W2", "W2_bar", "w2",
+                                "W3", "W3_bar", "w3", "i3")
+
+#Create a dataframe to store the final calculations of I in
+opp_selection_episodes_fem <- data.frame(matrix(ncol = 11,
+                                            nrow = 0))
+colnames(opp_selection_episodes_fem) <- c("trial_num", "I_1", "I_1per", "I_2", "I_2per", 
+                                          "I_3", "I_3per", "I_12", "I_12per",
+                                          "I", "Iper")
+
+for (trial in unique(fem_succ$trial_num)) {
+  
+  #Subset the overall dataframe to work with an individual trial
+  tmp <- fem_succ[fem_succ$trial_num == trial, ]
+  
+  #Calculate the absolute pre-copultory fitness (Eq. 14 Arnold & Wade 1984)
+  tmp$w1 <- tmp$MatingSuccess/mean(tmp$MatingSuccess) #Relative mating success
+  tmp$w1_squared <- (tmp$w1)^2
+  
+  I_1 <- var(tmp$w1) #Variance in relative mating success
+  
+  #Post-copulatory selection event 1 (Number of eggs transferred) (Eq. 15 Arnold & Wade 1984)
+  tmp$W2 <- ifelse(tmp$MatingSuccess > 0,
+                   tmp$totalEggs/tmp$MatingSuccess,
+                   0) #Number of eggs per mate
+  tmp$W2_bar <- tmp$W2 * (tmp$w1/nrow(tmp)) #Number of eggs per mate adjusted by the # of individuals with fitness W
+  tmp$w2 <- tmp$W2/sum(tmp$W2_bar)
+  
+  I_2 <- (sum((tmp$w1 * (tmp$w2)^2))/nrow(tmp) - 1) * nrow(tmp)/(nrow(tmp) - 1)
+  
+  #Post-copulatory selection event 2 (Number of eggs developed) (Eq. 16 Arnold & Wade 1984)
+  tmp$W3 <- ifelse(tmp$totalEggs > 0,
+                   tmp$NumDeveloped/tmp$totalEggs,
+                   0) #Proportion of transferred eggs that developed
+  tmp$W3_bar <- tmp$W3 * ((tmp$totalEggs/mean(tmp$totalEggs))/nrow(tmp)) #Prop. of eggs developed adjusted by the # of individuals with fitness W
+  tmp$w3 <- tmp$W3/sum(tmp$W3_bar)
+  tmp$i3 <- ((tmp$totalEggs/mean(tmp$totalEggs))/nrow(tmp)) * ((tmp$w3 - 1)^2)
+  
+  I_3 <- sum(tmp$i3) * nrow(tmp)/(nrow(tmp) - 1)
+
+  I_12 <- var(tmp$totalEggs)/(mean(tmp$totalEggs)^2)
+  
+  #Total selection
+  I <- var(tmp$NumDeveloped)/(mean(tmp$NumDeveloped)^2)
+  
+  #Calculating percentages for each selection event
+  I_1per <- (I_1/I)*100
+  I_2per <- (I_2/I)*100
+  I_3per <- (I_3/I)*100
+  I_12per <- (I_12/I)*100
+  Iper <- (I/I)*100
+  
+  #Combining all of the selection values (Is) and saving the output
+  trial_num <- trial
+  selection <- cbind(trial_num, I_1, I_1per, I_2, I_2per, I_3, I_3per,
+                     I_12, I_12per, I, Iper)
+  
+  opp_selection_episodes_fem <- rbind(opp_selection_episodes_fem, selection)
+  
+  #Save the intermediate values
+  fem_succ_fitness <- rbind(fem_succ_fitness, tmp)
+  #browser()
+}
+
+```
+
+```{r opp-selection-males}
+#Create a dataframe to store all of the intermediate values of fitness in
+mal_succ_fitness <- data.frame(matrix(ncol = ncol(mal_succ) + 9,
+                                      nrow = 0))
+colnames(mal_succ_fitness) <- c(colnames(mal_succ),
+                                "w1", "w1_squared",
+                                "W2", "W2_bar", "w2",
+                                "W3", "W3_bar", "w3", "i3")
+
+#Create a dataframe to store the final calculations of I in
+opp_selection_episodes_mal <- data.frame(matrix(ncol = 11,
+                                            nrow = 0))
+colnames(opp_selection_episodes_mal) <- c("trial_num", "I_1", "I_1per", "I_2", "I_2per", 
+                                          "I_3", "I_3per", "I_12", "I_12per",
+                                          "I", "Iper")
+
+for (trial in unique(mal_succ$trial_num)) {
+  
+  #Subset the overall dataframe to work with an individual trial
+  tmp <- mal_succ[mal_succ$trial_num == trial, ]
+  
+  #Calculate the absolute pre-copultory fitness (Eq. 14 Arnold & Wade 1984)
+  tmp$w1 <- tmp$MatingSuccess/mean(tmp$MatingSuccess) #Relative mating success
+  tmp$w1_squared <- (tmp$w1)^2
+  
+  I_1 <- var(tmp$w1) #Variance in relative mating success
+  
+  #Post-copulatory selection event 1 (Number of eggs transferred) (Eq. 15 Arnold & Wade 1984)
+  tmp$W2 <- ifelse(tmp$MatingSuccess > 0,
+                   tmp$totalEggs/tmp$MatingSuccess,
+                   0) #Number of eggs per mate
+  tmp$W2_bar <- tmp$W2 * (tmp$w1/nrow(tmp)) #Number of eggs per mate adjusted by the # of individuals with fitness W
+  tmp$w2 <- tmp$W2/sum(tmp$W2_bar)
+  
+  I_2 <- (sum((tmp$w1 * (tmp$w2)^2))/nrow(tmp) - 1) * nrow(tmp)/(nrow(tmp) - 1)
+  
+  #Post-copulatory selection event 2 (Number of eggs developed) (Eq. 16 Arnold & Wade 1984)
+  tmp$W3 <- ifelse(tmp$totalEggs > 0,
+                   tmp$NumDeveloped_Calc/tmp$totalEggs,
+                   0) #Proportion of transferred eggs that developed
+  tmp$W3_bar <- tmp$W3 * ((tmp$totalEggs/mean(tmp$totalEggs))/nrow(tmp)) #Prop. of eggs developed adjusted by the # of individuals with fitness W
+  tmp$w3 <- tmp$W3/sum(tmp$W3_bar)
+  tmp$i3 <- ((tmp$totalEggs/mean(tmp$totalEggs))/nrow(tmp)) * ((tmp$w3 - 1)^2)
+  
+  I_3 <- sum(tmp$i3) * nrow(tmp)/(nrow(tmp) - 1)
+
+  I_12 <- var(tmp$totalEggs)/(mean(tmp$totalEggs)^2)
+  
+  #Total selection
+  I <- var(tmp$NumDeveloped_Calc)/(mean(tmp$NumDeveloped_Calc)^2)
+  
+  #Calculating percentages for each selection event
+  I_1per <- (I_1/I)*100
+  I_2per <- (I_2/I)*100
+  I_3per <- (I_3/I)*100
+  I_12per <- (I_12/I)*100
+  Iper <- (I/I)*100
+  
+  #Combining all of the selection values (Is) and saving the output
+  trial_num <- trial
+  selection <- cbind(trial_num, I_1, I_1per, I_2, I_2per, I_3, I_3per,
+                     I_12, I_12per, I, Iper)
+  
+  opp_selection_episodes_mal <- rbind(opp_selection_episodes_mal, selection)
+  
+  #Save the intermediate values
+  mal_succ_fitness <- rbind(mal_succ_fitness, tmp)
+  #browser()
+}
+
+```
+
+```{r}
+opp_selection_episodes_fem$Sex <- "F"
+opp_selection_episodes_mal$Sex <- "M"
+
+opp_selection_episodes_all <- rbind(opp_selection_episodes_fem, opp_selection_episodes_mal)
+
+library(gtsummary)
+opp_selection_table <- tbl_summary(opp_selection_episodes_all,
+            include = c("I_1", "I_2",  "I_3", "I_12", "I"),
+            statistic = list(all_continuous() ~ "{mean} ({sd})"),
+            type = list(everything() ~ "continuous"),
+            #label = list(I_1 ~ expression(I[1])),
+            by = Sex) 
+
+tbl_summary(opp_selection_episodes_all,
+            include = c("I_1per", "I_2per",  "I_3per", "I_12per", "Iper"),
+            statistic = list(all_continuous() ~ "{mean}"),
+            type = list(everything() ~ "continuous"),
+            #label = list(I_1 ~ expression(I[1])),
+            by = Sex) 
+
+#Confidence intervals
+t_test <- qt(p = 0.975, df = (nrow(opp_selection_episodes_mal) - 1))
+
+seI1 <- tapply(opp_selection_episodes_all$I_1, opp_selection_episodes_all$Sex, function(x){
+  sqrt(var(x))/sqrt(length(x))
+})
+meanI1 <- tapply(opp_selection_episodes_all$I_1, opp_selection_episodes_all$Sex, mean)
+meanI1 - seI1*t_test
+
+seI2 <- tapply(opp_selection_episodes_all$I_2, opp_selection_episodes_all$Sex, function(x){
+  sqrt(var(x))/sqrt(length(x))
+})
+meanI2 <- tapply(opp_selection_episodes_all$I_2, opp_selection_episodes_all$Sex, mean)
+meanI2 + seI2*t_test
+
+seI3 <- tapply(opp_selection_episodes_all$I_3, opp_selection_episodes_all$Sex, function(x){
+  sqrt(var(x))/sqrt(length(x))
+})
+meanI3 <- tapply(opp_selection_episodes_all$I_3, opp_selection_episodes_all$Sex, mean)
+meanI3 + seI3*t_test
+
+seI12 <- tapply(opp_selection_episodes_all$I_12, opp_selection_episodes_all$Sex, function(x){
+  sqrt(var(x))/sqrt(length(x))
+})
+meanI12 <- tapply(opp_selection_episodes_all$I_12, opp_selection_episodes_all$Sex, mean)
+meanI12 - seI12*t_test
+
+seI <- tapply(opp_selection_episodes_all$I, opp_selection_episodes_all$Sex, function(x){
+  sqrt(var(x))/sqrt(length(x))
+})
+meanI <- tapply(opp_selection_episodes_all$I, opp_selection_episodes_all$Sex, mean)
+meanI - seI*t_test
+
+```
+
+
+
+
 
 # Generating the figures
 ```{r fig-6v1}
