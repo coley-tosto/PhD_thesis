@@ -25,6 +25,7 @@ knitr::opts_knit$set(root.dir='../',
 #This is a cohesive list of all the libraries used in this document
 library(DESeq2)
 library(ggplot2)
+library(EnvStats)
 ```
 
 ``` {r functions, include = FALSE}
@@ -362,13 +363,13 @@ I used the same steps as above to see how the relationship changes when I add in
 ```{r tau-v-FC, echo=FALSE, fig.cap="Sex bias (in terms of the absolute value of the log2FoldChange) versus tissue specificity (tau) for all genes that are signifcantly expressed in the gonads, liver, and gills."}
 #Merge the noNA datasets that include all of the sex-biased and non-sex-biased genes with the tau datasets
 liver_bias_tau_all <- merge(as.data.frame(liver_con_res_noNA), as.data.frame(tau), by = "row.names")
-write.csv(liver_bias_tau_all, "liver_bias_tau.csv", row.names = FALSE)
+#write.csv(liver_bias_tau_all, "liver_bias_tau.csv", row.names = FALSE)
 
 gonad_bias_tau_all <- merge(as.data.frame(gonad_con_res_noNA), as.data.frame(tau), by = "row.names")
-write.csv(gonad_bias_tau_all, "gonad_bias_tau.csv", row.names = FALSE)
+#write.csv(gonad_bias_tau_all, "gonad_bias_tau.csv", row.names = FALSE)
 
 gill_bias_tau_all <- merge(as.data.frame(gill_con_res_noNA), as.data.frame(tau), by = "row.names")
-write.csv(gill_bias_tau_all, "gill_bias_tau.csv", row.names = FALSE)
+#write.csv(gill_bias_tau_all, "gill_bias_tau.csv", row.names = FALSE)
 
 
 #Plot logFC against Tau for all of the organs
@@ -585,6 +586,8 @@ dds_FL_filtered$Organ <- ifelse(dds_FL_filtered$Organ =="Ovaries",
                                paste0("Gonad"),
                                paste0(dds_FL_filtered$Organ))
                         )
+dds_FL_filtered$Organ <- as.factor(dds_FL_filtered$Organ)
+
 #Create a vector with the different organ types
 organs <- levels(colData(dds_FL_filtered)$Organ)
 
@@ -635,28 +638,35 @@ for(organ in organs){
 } 
 ```
 
+```{r}
+logFC_long_all_orig<- logFC_long_all
+```
 
 ```{r}
 organs <- c("Gill", "Gill", "Gonad", "Gonad", "Liver", "Liver")
 bias <- c("MB", "FB", "MB", "FB", "MB", "FB")
 
-for(i in 1:length(FL_sex_specific_genes)){
+logFC_long_all <- logFC_long_all_orig
+
+for(i in 1:length(FL_sex_specific_genes)){#
 
   tmp <- FL_sex_specific_genes[[i]]
   tmp <- as.data.frame(tmp)
   tmp$geneID <- rownames(tmp)
   
-  ssp<-do.call(rbind,apply(tmp, 1, function(one_gene){
+  for(j in 1:nrow(tmp)){
     
-    if(one_gene["geneID"] %in% 
-       logFC_long_all$geneID[logFC_long_all$tissue == organs[[i]] &
-                             logFC_long_all$bias == bias[[i]]]){
-      
-      one_gene_dat<-logFC_long_all[logFC_long_all$geneID == one_gene["geneID"] &
-                       logFC_long_all$tissue == organs[[i]],
-                     ]
-      one_gene_dat$bias_cat <- "Sex-specific"
-      
+    one_gene <- tmp[j, ]
+    
+    
+    if(one_gene[["geneID"]] %in%
+       logFC_long_all[logFC_long_all$tissue == organs[[i]] &
+                             logFC_long_all$bias == bias[[i]],"geneID"]){
+        #browser()
+       logFC_long_all[logFC_long_all$geneID == one_gene[["geneID"]] &
+                      logFC_long_all$tissue == organs[[i]] &
+                      logFC_long_all$bias == bias[[i]],"bias_cat"
+                      ] <- "Sex-specific"
     }else{
       
       one_gene_dat <- data.frame(matrix(ncol= ncol(logFC_long_all),
@@ -664,20 +674,19 @@ for(i in 1:length(FL_sex_specific_genes)){
       colnames(one_gene_dat) <- colnames(logFC_long_all)
       
       one_gene_dat$tissue <- organs[[i]]
-      one_gene_dat$geneID <- one_gene["geneID"]
-      one_gene_dat$tau <- tau[names(tau) == one_gene["geneID"]]
+      one_gene_dat$geneID <- one_gene[["geneID"]]
+      one_gene_dat$tau <- tau[names(tau) == one_gene[["geneID"]]]
       one_gene_dat$bias <- bias[[i]]
       one_gene_dat$bias_cat <- "Sex-specific"
-    
+      rownames(one_gene_dat) <- NULL
+      
+      logFC_long_all <- rbind(one_gene_dat, logFC_long_all)
+      #browser()
+      rownames(logFC_long_all) <- NULL
     }
     
-    
-    return(one_gene_dat)
-  }))
-  rownames(ssp)<-NULL
-  logFC_long_all<-rbind(logFC_long_all, ssp)
-  browser()
-}
+  }
+ }
 ```
 
 
@@ -759,13 +768,12 @@ geom_point(data = logFC_long_all[logFC_long_all$bias == "UB",], aes(x=bias_cat, 
 
 ```{r tau-v-biascat-plot-all-vp, echo=FALSE, fig.height=8, fig.cap="Violin plot showing tissue specifcity (tau) across the different bias levels. Color denotes female-biased versus male biased versus unbiased."}
 my_colors <- c("FB" = "#7fc97f", "MB" = "#beaed4", "UB" = "darkgray" )
+logFC_long_all$bias_cat <- factor(logFC_long_all$bias_cat,
+    levels = biased_bins, ordered = TRUE)
 
-sample_size = logFC_long_all %>% group_by(bias_cat, bias, tissue) %>% summarize(num=n())
-logFC_long_all$group <- paste0(logFC_long$bias, logFC_long_all$bias_cat)
+write.csv(logFC_long_all, "logFC_long_taubias_SS.csv", row.names = FALSE)
 
 logFC_long_all %>%
-  #left_join(sample_size) %>%
-  #mutate(myaxis = paste0(bias_cat, "\n", "n=", num)) %>%
   ggplot(aes(x = bias_cat, y = tau, fill = bias)) +
     geom_violin(position = position_dodge(), draw_quantiles = c(0.5)) +
     geom_boxplot(width = 0.1, color = "black", position = position_dodge(width = 0.9)) +
