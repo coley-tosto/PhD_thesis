@@ -639,14 +639,34 @@ for(organ in organs){
 ```
 
 ```{r}
-logFC_long_all_orig<- logFC_long_all
+#Looking at the relationship between male expression and female expression
+my_colors <- c("Gonad" = "#EEB42275", "Liver" = "#EE826275", "Gill" = "#20B2AA75")
+for (organ in organs) {
+  
+  tmp <- as.data.frame(assay(dds_FL_filtered)[, dds_FL_filtered$Organ == organ])
+  tmp_M <- assay(dds_FL_filtered)[, dds_FL_filtered$Sex == "M" & dds_FL_filtered$Organ == organ]
+  tmp_F <- assay(dds_FL_filtered)[, dds_FL_filtered$Sex == "F" & dds_FL_filtered$Organ == organ]
+  
+  tmp$Fmedian <- apply(tmp[, c(colnames(tmp_F))], 1, median)
+  tmp$Mmedian <- apply(tmp[, c(colnames(tmp_M))], 1, median)
+  
+  plot(tmp$Fmedian, tmp$Mmedian,
+       ylab = "Male Expression",
+       xlab = "Female Expression",
+       main = organ,
+       col = my_colors[organ],
+       pch = 19,
+       ylim = c(0, 20000),
+       xlim = c(0, 20000))
+  
+}
+
 ```
+
 
 ```{r}
 organs <- c("Gill", "Gill", "Gonad", "Gonad", "Liver", "Liver")
 bias <- c("MB", "FB", "MB", "FB", "MB", "FB")
-
-logFC_long_all <- logFC_long_all_orig
 
 for(i in 1:length(FL_sex_specific_genes)){#
 
