@@ -586,9 +586,164 @@ meanI - seI*t_test
 ```
 
 
+## Decomposition of selection differentials (s)
+```{r selection-diff-females}
+#Create a dataframe to store all of the intermediate values of fitness in
+fem_succ_select_diff <- data.frame(matrix(ncol = ncol(fem_succ) + 6,
+                                          nrow = 0))
+colnames(fem_succ_select_diff) <- c(colnames(fem_succ),
+                                    "fit1", "eggs_per_mate","fit2", "prop_dev", "fit3", "StdLength")
 
+#Create a dataframe to store the final calculations of I in
+select_diff_fem <- data.frame(matrix(ncol = 11,
+                                            nrow = 0))
+colnames(select_diff_fem) <- c("trial", "s1", "s2", "s3", "s12", "s123",
+                               "s1_prime", "s2_prime", "s3_prime", "s12_prime", "s123_prime")
 
+for (trial in unique(fem_succ$trial_num)) {
+  
+  #Subset the overall dataframe to work with an individual trial
+  tmp <- fem_succ[fem_succ$trial_num == trial, ]
+  
+  #Calculate fitness relating to pre-cop. selection (#matings)
+  tmp$fit1 <- tmp$MatingSuccess/mean(tmp$MatingSuccess) #Relative mating success
 
+  #Calculate fitness relating to post-mating selection (#eggs transferred)
+  tmp$eggs_per_mate <- tmp$totalEggs/tmp$MatingSuccess
+  tmp$fit2 <- ifelse(tmp$MatingSuccess > 0,
+                     tmp$eggs_per_mate/mean(tmp$eggs_per_mate, na.rm = TRUE),
+                     0) #Relative eggs transferred
+
+  #Calculate fitness relating to post-mating selection (eggs that developed)
+  tmp$prop_dev <- (tmp$NumDeveloped/tmp$MatingSuccess)/tmp$eggs_per_mate
+  tmp$fit3 <- ifelse(tmp$MatingSuccess > 0,
+                     tmp$prop_dev/mean(tmp$prop_dev, na.rm = TRUE),
+                     0)
+  
+  #Standardizing the trait value to have a mean of 0 and sd of unity
+  tmp$StdLength <- (tmp$length - mean(tmp$length))/sd(tmp$length)
+  
+  #Calculating the absolute selection differentials (s)
+  s1 <- cov(tmp$length, tmp$fit1)
+  s12 <- cov(tmp$length, tmp$fit2)
+  s123 <- cov(tmp$length, tmp$fit3)
+  s2 <- s12 - s1
+  s3 <- s123 - s12
+  
+  #Calculating the standardized selection differentials (s')
+  s1_prime <- cov(tmp$StdLength, tmp$fit1)
+  s12_prime <- cov(tmp$StdLength, tmp$fit2)
+  s123_prime <- cov(tmp$StdLength, tmp$fit3)
+  s2_prime <- s12_prime - s1_prime
+  s3_prime <- s123_prime - s12_prime
+  
+  #Combining all of the selection differentials (s, s') and saving the output
+  selection <- cbind(trial, s1, s2, s3, s12, s123, 
+                     s1_prime, s2_prime, s3_prime, s12_prime, s123_prime)
+  
+  select_diff_fem <- rbind(select_diff_fem, selection)
+  
+  #Save the intermediate values
+  fem_succ_select_diff <- rbind(fem_succ_select_diff, tmp)
+}
+
+```
+
+```{r selection-diff-males}
+#Create a dataframe to store all of the intermediate values of fitness in
+mal_succ_select_diff <- data.frame(matrix(ncol = ncol(mal_succ) + 6,
+                                          nrow = 0))
+colnames(mal_succ_select_diff) <- c(colnames(mal_succ),
+                                    "fit1", "eggs_per_mate","fit2", "prop_dev", "fit3", "StdLength")
+
+#Create a dataframe to store the final calculations of I in
+select_diff_mal <- data.frame(matrix(ncol = 11,
+                                            nrow = 0))
+colnames(select_diff_mal) <- c("trial", "s1", "s2", "s3", "s12", "s123",
+                               "s1_prime", "s2_prime", "s3_prime", "s12_prime", "s123_prime")
+
+for (trial in unique(mal_succ$trial_num)) {
+  
+  #Subset the overall dataframe to work with an individual trial
+  tmp <- mal_succ[mal_succ$trial_num == trial, ]
+  
+  #Calculate fitness relating to pre-cop. selection (#matings)
+  tmp$fit1 <- tmp$MatingSuccess/mean(tmp$MatingSuccess) #Relative mating success
+
+  #Calculate fitness relating to post-mating selection (#eggs transferred)
+  tmp$eggs_per_mate <- tmp$totalEggs/tmp$MatingSuccess
+  tmp$fit2 <- ifelse(tmp$MatingSuccess > 0,
+                     tmp$eggs_per_mate/mean(tmp$eggs_per_mate, na.rm = TRUE),
+                     0) #Relative eggs transferred
+
+  #Calculate fitness relating to post-mating selection (eggs that developed)
+  tmp$prop_dev <- (tmp$NumDeveloped_Calc/tmp$MatingSuccess)/tmp$eggs_per_mate
+  tmp$fit3 <- ifelse(tmp$MatingSuccess > 0,
+                     tmp$prop_dev/mean(tmp$prop_dev, na.rm = TRUE),
+                     0)
+  
+  #Standardizing the trait value to have a mean of 0 and sd of unity
+  tmp$StdLength <- (tmp$length - mean(tmp$length))/sd(tmp$length)
+  
+  #Calculating the absolute selection differentials (s)
+  s1 <- cov(tmp$length, tmp$fit1)
+  s12 <- cov(tmp$length, tmp$fit2)
+  s123 <- cov(tmp$length, tmp$fit3)
+  s2 <- s12 - s1
+  s3 <- s123 - s12
+  
+  #Calculating the standardized selection differentials (s')
+  s1_prime <- cov(tmp$StdLength, tmp$fit1)
+  s12_prime <- cov(tmp$StdLength, tmp$fit2)
+  s123_prime <- cov(tmp$StdLength, tmp$fit3)
+  s2_prime <- s12_prime - s1_prime
+  s3_prime <- s123_prime - s12_prime
+  
+  #Combining all of the selection differentials (s, s') and saving the output
+  selection <- cbind(trial, s1, s2, s3, s12, s123, 
+                     s1_prime, s2_prime, s3_prime, s12_prime, s123_prime)
+  
+  select_diff_mal <- rbind(select_diff_mal, selection)
+  
+  #Save the intermediate values
+  mal_succ_select_diff <- rbind(mal_succ_select_diff, tmp)
+}
+
+```
+
+```{r selection-diff-sum}
+select_diff_fem$Sex <- "F"
+select_diff_mal$Sex <- "M"
+
+select_diff_all <- rbind(select_diff_fem, select_diff_mal)
+
+#Confidence intervals
+t_test <- qt(p = 0.975, df = (nrow(select_diff_mal) - 1))
+
+se_s1 <- tapply(select_diff_all$s1, select_diff_all$Sex, function(x){
+  sqrt(var(x))/sqrt(length(x))
+})
+mean_s1 <- tapply(select_diff_all$s1, select_diff_all$Sex, mean)
+mean_s1 - se_s1*t_test
+
+se_s2 <- tapply(select_diff_all$s2, select_diff_all$Sex, function(x){
+  sqrt(var(x))/sqrt(length(x))
+})
+mean_s2 <- tapply(select_diff_all$s2, select_diff_all$Sex, mean)
+mean_s2 + se_s2*t_test
+
+se_s3 <- tapply(select_diff_all$s3, select_diff_all$Sex, function(x){
+  sqrt(var(x))/sqrt(length(x))
+})
+mean_s3 <- tapply(select_diff_all$s3, select_diff_all$Sex, mean)
+mean_s3 - se_s3*t_test
+
+se_s123 <- tapply(select_diff_all$s123, select_diff_all$Sex, function(x){
+  sqrt(var(x))/sqrt(length(x))
+})
+mean_s123 <- tapply(select_diff_all$s123, select_diff_all$Sex, mean)
+mean_s123 + se_s123*t_test
+```
 # Generating the figures
 ```{r fig-6v1}
 bateman <- ggplot(data = fem_succ, aes(x = MatingSuccess, y = relative_fit)) +
