@@ -717,7 +717,7 @@ select_diff_mal$Sex <- "M"
 
 select_diff_all <- rbind(select_diff_fem, select_diff_mal)
 
-#Confidence intervals
+#Confidence intervals - absolute selection differentials
 t_test <- qt(p = 0.975, df = (nrow(select_diff_mal) - 1))
 
 se_s1 <- tapply(select_diff_all$s1, select_diff_all$Sex, function(x){
@@ -743,7 +743,34 @@ se_s123 <- tapply(select_diff_all$s123, select_diff_all$Sex, function(x){
 })
 mean_s123 <- tapply(select_diff_all$s123, select_diff_all$Sex, mean)
 mean_s123 + se_s123*t_test
+
+#Confidence intervals - standardized selection differentials
+se_s1_prime <- tapply(select_diff_all$s1_prime, select_diff_all$Sex, function(x){
+  sqrt(var(x))/sqrt(length(x))
+})
+mean_s1_prime <- tapply(select_diff_all$s1_prime, select_diff_all$Sex, mean)
+mean_s1_prime + se_s1_prime*t_test
+
+se_s2_prime <- tapply(select_diff_all$s2_prime, select_diff_all$Sex, function(x){
+  sqrt(var(x))/sqrt(length(x))
+})
+mean_s2_prime <- tapply(select_diff_all$s2_prime, select_diff_all$Sex, mean)
+mean_s2_prime - se_s2_prime*t_test
+
+se_s3_prime <- tapply(select_diff_all$s3_prime, select_diff_all$Sex, function(x){
+  sqrt(var(x))/sqrt(length(x))
+})
+mean_s3_prime <- tapply(select_diff_all$s3_prime, select_diff_all$Sex, mean)
+mean_s3_prime + se_s3_prime*t_test
+
+se_s123_prime <- tapply(select_diff_all$s123_prime, select_diff_all$Sex, function(x){
+  sqrt(var(x))/sqrt(length(x))
+})
+mean_s123_prime <- tapply(select_diff_all$s123_prime, select_diff_all$Sex, mean)
+mean_s123_prime - se_s123_prime*t_test
 ```
+
+
 # Generating the figures
 ```{r fig-6v1}
 bateman <- ggplot(data = fem_succ, aes(x = MatingSuccess, y = relative_fit)) +
