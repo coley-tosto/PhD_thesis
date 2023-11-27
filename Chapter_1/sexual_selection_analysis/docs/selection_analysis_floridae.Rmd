@@ -24,7 +24,8 @@ knitr::opts_knit$set(root.dir='../',
 
 ``` {r library, message = FALSE, warning = FALSE}
 #This is a cohesive list of all the libraries used in this document
-
+library(ggplot2)
+library(cowplot)
 ```
 
 ``` {r functions, include = FALSE}
@@ -285,103 +286,6 @@ t.test(fem_succ$depth ~ fem_succ$mated, var.equal = FALSE)
 wilcox.test(fem_succ$svl ~ fem_succ$mated)
 wilcox.test(fem_succ$weight ~ fem_succ$mated)
 ```
-
-# Mate success versus Reproductive success (Bateman Gradient)
-I now want to look at any relationship that may exist between mating success and reproductive success for males and females. The Bateman gradient will be calculated, which is the slope of the weighted least-squares regression of relative reproductive success (number of offspring divided by the mean) on mating success.
-
-```{r, echo=FALSE, fig.cap="Relationship between reproductive success and mating success for male (purple) and female (green) _Syngnathus floridae_. Reproductive success is shown as relative fitness (i.e. number of offspring produced divided by the mean number of offspring produced). Bateman's gradient is shown as the weighted least-squares regression line (dashed) for males and females.", fig.height=5}
-#Calculating relative fitness as a metric for reproductive success
-fem_succ$totalEggs <- as.numeric(fem_succ$totalEggs)
-fem_succ$MatingSuccess <- as.numeric(fem_succ$MatingSuccess)
-fem_succ$relative_fit <- fem_succ$totalEggs/mean(fem_succ$totalEggs)
-mal_succ$totalEggs <- as.numeric(mal_succ$totalEggs)
-mal_succ$MatingSuccess <- as.numeric(mal_succ$MatingSuccess)
-mal_succ$relative_fit <- mal_succ$totalEggs/mean(mal_succ$totalEggs)
-
-#Generating Bateman's gradient
-#Define the model
-fem_model <- lm(fem_succ$relative_fit ~ fem_succ$MatingSuccess)
-mal_model <- lm(mal_succ$relative_fit ~ mal_succ$MatingSuccess)
-
-#define weights to use
-wt_fem <- 1 / lm(abs(fem_model$residuals) ~ fem_model$fitted.values)$fitted.values^2
-wt_mal <- 1 / lm(abs(mal_model$residuals) ~ mal_model$fitted.values)$fitted.values^2
-
-#perform weighted least squares regression
-wls_model_fem <- lm(fem_succ$relative_fit ~ fem_succ$MatingSuccess, weights=wt_fem)
-wls_model_mal <- lm(mal_succ$relative_fit ~ mal_succ$MatingSuccess, weights=wt_mal)
-
-#Plotting the relationship between the mating and reproductive success
-par(mfrow=c(1,1))
-plot(fem_succ$MatingSuccess,
-     fem_succ$relative_fit,
-     xlab = "Number of Mates (mating success)",
-     ylab = "Relative Fitness (reproductive success)",
-     pch = 19,
-     col = "#7fc97f75")
-points(mal_succ$MatingSuccess,
-       mal_succ$relative_fit,
-       xlab = "Number of Mates (mating success)",
-       ylab = "Relative Fitness (reproductive success)",
-       pch = 19,
-       col = "#beaed475")
-abline(wls_model_fem, col = "#7fc97f", lwd = 3, lty = 2)
-abline(wls_model_mal, col = "#beaed4", lwd = 3, lty = 2)
-
-
-```
-
-```{r}
-summary(wls_model_fem)
-summary(wls_model_mal)
-```
-
-```{r}
-mal_succ$prop_surviving <- ifelse(mal_succ$totalEggs == 0, 0,
-                                  mal_succ$NumDeveloped_Calc/mal_succ$totalEggs)
-fem_succ$prop_surviving <- ifelse(fem_succ$totalEggs == 0, 0,
-                                  fem_succ$NumDeveloped/fem_succ$totalEggs)
-
-plot(fem_succ$MatingSuccess[fem_succ$totalEggs != 0],
-     fem_succ$prop_surviving[fem_succ$totalEggs != 0],
-     xlab = "Number of Mates (mating success)",
-     ylab = "Proportion of Surviving Offpring",
-     pch = 19,
-     col = "#7fc97f75")
-points(mal_succ$MatingSuccess[mal_succ$totalEggs != 0],
-       mal_succ$prop_surviving[mal_succ$totalEggs != 0],
-       xlab = "Number of Mates (mating success)",
-       ylab = "Proportion of Surviving Offpring",
-       pch = 19,
-       col = "#beaed475")
-abline(lm(fem_succ$prop_surviving[fem_succ$totalEggs != 0] ~
-            fem_succ$MatingSuccess[fem_succ$totalEggs != 0]),
-       col = "#7fc97f", lwd = 3, lty = 2)
-abline(lm(mal_succ$prop_surviving[mal_succ$totalEggs != 0] ~
-            mal_succ$MatingSuccess[mal_succ$totalEggs != 0]),
-       col = "#beaed4", lwd = 3, lty = 2)
-
-
-plot(fem_succ$MatingSuccess,
-     fem_succ$prop_surviving,
-     xlab = "Number of Mates (mating success)",
-     ylab = "Proportion of Surviving Offpring",
-     pch = 19,
-     col = "#7fc97f75")
-points(mal_succ$MatingSuccess,
-       mal_succ$prop_surviving,
-       xlab = "Number of Mates (mating success)",
-       ylab = "Proportion of Surviving Offpring",
-       pch = 19,
-       col = "#beaed475")
-abline(lm(fem_succ$prop_surviving ~
-            fem_succ$MatingSuccess),
-       col = "#7fc97f", lwd = 3, lty = 2)
-abline(lm(mal_succ$prop_surviving ~
-            mal_succ$MatingSuccess),
-       col = "#beaed4", lwd = 3, lty = 2)
-```
-
 
 # Episode of Sexual Selection
 ## Partitioning the Total Opportunity for Selection (I)
@@ -768,6 +672,127 @@ se_s123_prime <- tapply(select_diff_all$s123_prime, select_diff_all$Sex, functio
 })
 mean_s123_prime <- tapply(select_diff_all$s123_prime, select_diff_all$Sex, mean)
 mean_s123_prime - se_s123_prime*t_test
+```
+
+# Mate success versus Reproductive success (Bateman Gradient)
+I now want to look at any relationship that may exist between mating success and reproductive success for males and females. The Bateman gradient will be calculated, which is the slope of the weighted least-squares regression of relative reproductive success (number of offspring divided by the mean) on mating success.
+
+```{r, echo=FALSE, fig.cap="Relationship between reproductive success and mating success for male (purple) and female (green) _Syngnathus floridae_. Reproductive success is shown as relative fitness (i.e. number of offspring produced divided by the mean number of offspring produced). Bateman's gradient is shown as the weighted least-squares regression line (dashed) for males and females.", fig.height=5}
+#Calculating relative fitness as a metric for reproductive success
+fem_succ$totalEggs <- as.numeric(fem_succ$totalEggs)
+fem_succ$MatingSuccess <- as.numeric(fem_succ$MatingSuccess)
+fem_succ$relative_fit <- fem_succ$totalEggs/mean(fem_succ$totalEggs)
+mal_succ$totalEggs <- as.numeric(mal_succ$totalEggs)
+mal_succ$MatingSuccess <- as.numeric(mal_succ$MatingSuccess)
+mal_succ$relative_fit <- mal_succ$totalEggs/mean(mal_succ$totalEggs)
+
+#Generating Bateman's gradient
+#Define the model
+fem_model <- lm(fem_succ$relative_fit ~ fem_succ$MatingSuccess)
+mal_model <- lm(mal_succ$relative_fit ~ mal_succ$MatingSuccess)
+
+#define weights to use
+wt_fem <- 1 / lm(abs(fem_model$residuals) ~ fem_model$fitted.values)$fitted.values^2
+wt_mal <- 1 / lm(abs(mal_model$residuals) ~ mal_model$fitted.values)$fitted.values^2
+
+#perform weighted least squares regression
+wls_model_fem <- lm(fem_succ$relative_fit ~ fem_succ$MatingSuccess, weights=wt_fem)
+wls_model_mal <- lm(mal_succ$relative_fit ~ mal_succ$MatingSuccess, weights=wt_mal)
+
+#Plotting the relationship between the mating and reproductive success
+par(mfrow=c(1,1))
+plot(fem_succ$MatingSuccess,
+     fem_succ$relative_fit,
+     xlab = "Number of Mates (mating success)",
+     ylab = "Relative Fitness (reproductive success)",
+     pch = 19,
+     col = "#7fc97f75")
+points(mal_succ$MatingSuccess,
+       mal_succ$relative_fit,
+       xlab = "Number of Mates (mating success)",
+       ylab = "Relative Fitness (reproductive success)",
+       pch = 19,
+       col = "#beaed475")
+abline(wls_model_fem, col = "#7fc97f", lwd = 3, lty = 2)
+abline(wls_model_mal, col = "#beaed4", lwd = 3, lty = 2)
+
+
+```
+
+```{r}
+summary(wls_model_fem)
+summary(wls_model_mal)
+```
+
+```{r}
+mal_succ$prop_surviving <- ifelse(mal_succ$totalEggs == 0, 0,
+                                  mal_succ$NumDeveloped_Calc/mal_succ$totalEggs)
+fem_succ$prop_surviving <- ifelse(fem_succ$totalEggs == 0, 0,
+                                  fem_succ$NumDeveloped/fem_succ$totalEggs)
+
+plot(fem_succ$MatingSuccess[fem_succ$totalEggs != 0],
+     fem_succ$prop_surviving[fem_succ$totalEggs != 0],
+     xlab = "Number of Mates (mating success)",
+     ylab = "Proportion of Surviving Offpring",
+     pch = 19,
+     col = "#7fc97f75")
+points(mal_succ$MatingSuccess[mal_succ$totalEggs != 0],
+       mal_succ$prop_surviving[mal_succ$totalEggs != 0],
+       xlab = "Number of Mates (mating success)",
+       ylab = "Proportion of Surviving Offpring",
+       pch = 19,
+       col = "#beaed475")
+abline(lm(fem_succ$prop_surviving[fem_succ$totalEggs != 0] ~
+            fem_succ$MatingSuccess[fem_succ$totalEggs != 0]),
+       col = "#7fc97f", lwd = 3, lty = 2)
+abline(lm(mal_succ$prop_surviving[mal_succ$totalEggs != 0] ~
+            mal_succ$MatingSuccess[mal_succ$totalEggs != 0]),
+       col = "#beaed4", lwd = 3, lty = 2)
+
+
+plot(fem_succ$MatingSuccess,
+     fem_succ$prop_surviving,
+     xlab = "Number of Mates (mating success)",
+     ylab = "Proportion of Surviving Offpring",
+     pch = 19,
+     col = "#7fc97f75")
+points(mal_succ$MatingSuccess,
+       mal_succ$prop_surviving,
+       xlab = "Number of Mates (mating success)",
+       ylab = "Proportion of Surviving Offpring",
+       pch = 19,
+       col = "#beaed475")
+abline(lm(fem_succ$prop_surviving ~
+            fem_succ$MatingSuccess),
+       col = "#7fc97f", lwd = 3, lty = 2)
+abline(lm(mal_succ$prop_surviving ~
+            mal_succ$MatingSuccess),
+       col = "#beaed4", lwd = 3, lty = 2)
+```
+
+```{r}
+#Plotting the relationship between the mating and reproductive success without the two females who mated 3 times
+par(mfrow=c(1,1))
+plot(fem_succ$MatingSuccess[fem_succ$MatingSuccess < 3],
+     fem_succ$relative_fit[fem_succ$MatingSuccess < 3],
+     xlab = "Number of Mates (mating success)",
+     ylab = "Relative Fitness (reproductive success)",
+     pch = 19,
+     col = "#7fc97f75")
+points(mal_succ$MatingSuccess,
+       mal_succ$relative_fit,
+       xlab = "Number of Mates (mating success)",
+       ylab = "Relative Fitness (reproductive success)",
+       pch = 19,
+       col = "#beaed475")
+
+#Redefine the female model
+fem_model2 <- lm(fem_succ$relative_fit[fem_succ$MatingSuccess < 3] ~ fem_succ$MatingSuccess[fem_succ$MatingSuccess < 3])
+wt_fem2 <- 1 / lm(abs(fem_model2$residuals) ~ fem_model2$fitted.values)$fitted.values^2
+wls_model_fem2 <- lm(fem_succ$relative_fit[fem_succ$MatingSuccess < 3] ~ fem_succ$MatingSuccess[fem_succ$MatingSuccess < 3], weights=wt_fem2)
+
+abline(wls_model_fem2, col = "#7fc97f", lwd = 3, lty = 2)
+abline(wls_model_mal, col = "#beaed4", lwd = 3, lty = 2)
 ```
 
 
