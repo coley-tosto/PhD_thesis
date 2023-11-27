@@ -636,7 +636,7 @@ logFC_long<- data.frame(
   
 )
 
-write.csv(logFC_long, "data/logFC_long_sexbias.csv", row.names = FALSE)
+#write.csv(logFC_long, "data/logFC_long_sexbias.csv", row.names = FALSE)
 ```
 
 With the dataset in the proper format now, we can generate the plot
@@ -693,6 +693,9 @@ multcompLetters4(fc_var_aov, TukeyHSD(fc_var_aov))
 ##Fitting a negative binomial model
 library(MASS)
 model <- glm.nb(abs(logFC_long$logFC) ~ logFC_long$tissue * logFC_long$bias)
+
+
+coleyWank <- lm(abs(logFC_long$logFC)~ logFC_long$tissue * logFC_long$bias)
 ```
 
 
@@ -1263,14 +1266,15 @@ blast_output_merged$FL_malL_biased_TRgenes_blast <-
 go_tabs <- lapply(blast_output_merged, function(dat){
 
   tab <- data.frame(table(dat$panther_prot_class) )
-  tab$Var1[tab$Var1==""] <- NA
-  tab$prop <- tab$Freq/sum(tab$Freq)
+  tab$Var1 <- as.character(tab$Var1)
+  tab$Var1[tab$Var1==""] <- "Unclassified"
+  #tab$prop <- tab$Freq/sum(tab$Freq)
 
   return(tab)
   })
 
 
-all_go_dat <- data.frame(matrix(ncol=5,nrow=0))
+all_go_dat <- data.frame(matrix(ncol=4,nrow=0))
 colnames(all_go_dat) <- c(
   colnames(go_tabs$FL_femG_biased_TRgenes_blast),
   "bias_cat", "tissue"
@@ -1284,13 +1288,33 @@ for(i in 1:length(go_tabs)){
   all_go_dat<-rbind(all_go_dat, tmp)
 }
 
-all_go_dat$freq_organ <- 0
-length(unique(all_go_dat[all_go_dat$tissue == "Gill",]$Var1))
+all_go_sums <- data.frame(matrix(ncol = 4,
+                                 nrow = 0))
+colnames(all_go_sums) <- c("Freq", "prot_class", "tissue", "prop")
+
+for(organ in unique(all_go_dat$tissue)){
+  
+  tmp <- all_go_dat[all_go_dat$tissue == organ, ]
+  go_sums <- as.data.frame(tapply(tmp$Freq, tmp$Var1, sum))
+  go_sums$prot_class <- rownames(go_sums)
+  colnames(go_sums)[1] <- "Freq"
+  go_sums$tissue <- organ
+  rownames(go_sums) <- NULL
+  
+  go_sums$prop <- go_sums$Freq/sum(go_sums$Freq)
+  
+  all_go_sums <- rbind(all_go_sums, go_sums)
+
+}
+
+all_go_sums$prot_class_final <- ifelse(all_go_sums$prop < 0.02,
+                                       paste0("Other Protien Class"),
+                                       paste0(all_go_sums$prot_class))
 
 # make a barplot somehow
 my_colors <- c("Gonad" = "#EEB422", "Liver" = "#EE8262", "Gill" = "#20B2AA")
-ggplot(all_go_dat, 
-       aes(Var1, prop, fill = tissue)) +   
+ggplot(all_go_sums, 
+       aes(prot_class, prop, fill = tissue)) +   
   geom_bar(position = "dodge", stat="identity") +
   scale_fill_manual(values = my_colors) +
   theme(panel.grid.major = element_blank(), 
