@@ -64,8 +64,8 @@ trial_num,fishID,col_location,col_month,lat_to_trial,weight,length,depth,svl
 9,7,TBML,october,28,1.4,151.031,4.042,65.236
 9,8,TBML,october,28,4.1,192.601,6.841,88.563
 10,1,TBML,october,20,3,193.378,6.495,86.575
-10,2,TBML,october,20,8.7,225.72,108.674,9.953
-10,3,DC,october,26,4.7,198.763,87.167,7.274
+10,2,TBML,october,20,8.7,225.72,9.953,108.674
+10,3,DC,october,26,4.7,198.763,7.274,87.167
 10,4,TBML,october,20,1.9,159.222,4.915,70.759
 10,6,DC,october,26,2.8,170.93,5.56,75.035
 10,7,TBML,october,20,1.8,159.943,4.789,73.551
