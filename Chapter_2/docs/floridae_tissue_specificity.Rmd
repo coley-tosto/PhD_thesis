@@ -429,9 +429,9 @@ legend("topright", inset = c(-0.4, 0),
 The absolute value of the log2 fold change was square root transformed. We can see similar patterns as when we only plotted the sex biased genes (Fig. \@ref(fig:tau-v-bias)) with the strongest relationship showing up in the gonads. When we add in all of the points, however, it seems that the best fit line for the gills now slightly points downward (Fig. \@ref(fig:tau-v-FC)). Let's see how the Spearman's rank correlation test have changed. This was done between $\tau$ and the $|log2FoldChange|$ for each organ separately.
 
 ```{r tau-v-FC-cor, echo=FALSE, warning=FALSE}
-cor.test(gonad_bias_tau_all$tau, abs(gonad_bias_tau_all$log2FoldChange), method = "spearman")
-cor.test(liver_bias_tau_all$tau, abs(liver_bias_tau_all$log2FoldChange), method = "spearman")
-cor.test(gill_bias_tau_all$tau, abs(gill_bias_tau_all$log2FoldChange), method = "spearman")
+cor.test(gonad_bias_tau_all$tau, abs(gonad_bias_tau_all$log2FoldChange))#, method = "spearman")
+cor.test(liver_bias_tau_all$tau, abs(liver_bias_tau_all$log2FoldChange))#, method = "spearman")
+cor.test(gill_bias_tau_all$tau, abs(gill_bias_tau_all$log2FoldChange))#, method = "spearman")
 ```
 
 We can see the rho values going down for both the gonads and the liver, but the correlations are still significant. We can also see that in the gills we now have a significant negative correlation between sex bias and $\tau$.
@@ -456,17 +456,22 @@ tpms[rownames(tpms)== top_gonad$Row.names[11],] #Ovary-specific FB
 tpms[rownames(tpms)== top_gonad$Row.names[12],] #Liver-specific FB
 
 #Liver
-top_liver <- liver_bias_tau_all[sqrt(abs(liver_bias_tau_all$log2FoldChange)) > 4 & liver_bias_tau_all$tau > 0.75, ]
+top_liver <- liver_bias_tau_all[sqrt(abs(liver_bias_tau_all$log2FoldChange)) > 4 & liver_bias_tau_all$tau > 0.7, ]
 
 #Looking at the TPMS
 tpms[rownames(tpms)== top_liver$Row.names[1],] #Testis-specific MB
+
 tpms[rownames(tpms)== top_liver$Row.names[2],] #Testis-specific FB??
 tpms[rownames(tpms)== top_liver$Row.names[3],] #Liver-specific FB 
+
 tpms[rownames(tpms)== top_liver$Row.names[4],] #Gill-specific FB
+
 tpms[rownames(tpms)== top_liver$Row.names[5],] #Ovary-specific FB
 tpms[rownames(tpms)== top_liver$Row.names[6],] #Gill-specific FB 
 tpms[rownames(tpms)== top_liver$Row.names[7],] #Testis-specific FB?
 tpms[rownames(tpms)== top_liver$Row.names[8],] #Gill-specific FB
+
+tpms[rownames(tpms)== top_liver$Row.names[9],]
 
 #GILLS
 top_gills <- gill_bias_tau_all[sqrt(abs(gill_bias_tau_all$log2FoldChange)) > 4 & gill_bias_tau_all$tau > 0.75, ]
@@ -1076,8 +1081,8 @@ gill_bias_tau_all_gonads <- merge(as.data.frame(gill_con_res_noNA), as.data.fram
 
 
 #Plot logFC against Tau for all of the organs
-plot(sqrt(abs(gonad_bias_tau_all_gonads$log2FoldChange)),
-     gonad_bias_tau_all_gonads$tau,
+plot(sqrt(abs(gonad_bias_tau_all_gonads$log2FoldChange)[sqrt(abs(gonad_bias_tau_all_gonads$log2FoldChange)) < 4]),
+     gonad_bias_tau_all_gonads$tau[sqrt(abs(gonad_bias_tau_all_gonads$log2FoldChange)) < 4],
      pch=19,
      col = "#EEB42275",
      xlab="sex bias (|log2 fold change|)",
@@ -1094,7 +1099,7 @@ points(sqrt(abs(gill_bias_tau_all_gonads$log2FoldChange)),
      col = "#6E8B3D75")
 
 #Add the best fit lines
-abline(lm(gonad_bias_tau_all_gonads$tau ~ sqrt(abs(gonad_bias_tau_all_gonads$log2FoldChange))), 
+abline(lm(gonad_bias_tau_all_gonads$tau[sqrt(abs(gonad_bias_tau_all_gonads$log2FoldChange)) < 4] ~ sqrt(abs(gonad_bias_tau_all_gonads$log2FoldChange))[sqrt(abs(gonad_bias_tau_all_gonads$log2FoldChange)) < 4]), 
        col="#EEB422", lwd = 3)
 abline(lm(liver_bias_tau_all_gonads$tau ~ sqrt(abs(liver_bias_tau_all_gonads$log2FoldChange))), 
        col = "#EE8262", lwd = 3, lty = 2)
@@ -1119,4 +1124,84 @@ legend("bottomright", inset = c(-0.4, 0),
        text.width = 1.5,
        cex=1.0
        )
+```
+
+```{r tau-v-FC-cor-gonads, echo=FALSE, warning=FALSE}
+cor.test(gonad_bias_tau_all_gonads$tau[sqrt(abs(gonad_bias_tau_all_gonads$log2FoldChange)) < 4], 
+         abs(gonad_bias_tau_all_gonads$log2FoldChange)[sqrt(abs(gonad_bias_tau_all_gonads$log2FoldChange)) < 4], 
+         method = "spearman")
+cor.test(liver_bias_tau_all_gonads$tau, 
+         abs(liver_bias_tau_all_gonads$log2FoldChange), 
+         method = "spearman")
+cor.test(gill_bias_tau_all_gonads$tau, 
+         abs(gill_bias_tau_all_gonads$log2FoldChange), 
+         method = "spearman")
+
+cor.test(gonad_bias_tau_all_gonads$tau[sqrt(abs(gonad_bias_tau_all_gonads$log2FoldChange)) < 4], 
+         abs(gonad_bias_tau_all_gonads$log2FoldChange)[sqrt(abs(gonad_bias_tau_all_gonads$log2FoldChange)) < 4])
+cor.test(liver_bias_tau_all_gonads$tau, 
+         abs(liver_bias_tau_all_gonads$log2FoldChange))
+cor.test(gill_bias_tau_all_gonads$tau, 
+         abs(gill_bias_tau_all_gonads$log2FoldChange))
+```
+
+```{r}
+logFC_long_all_gonads <- merge(logFC_long_all, as.data.frame(tau_gonads), by.x = "geneID", by.y = "row.names")
+
+my_colors <- c("FB" = "#7fc97f", "MB" = "#beaed4", "UB" = "darkgray" )
+logFC_long_all_gonads$bias_cat <- factor(logFC_long_all_gonads$bias_cat,
+                                         levels = biased_bins, ordered = TRUE)
+logFC_long_all_gonads$tissue <- factor(logFC_long_all_gonads$tissue, 
+                                       levels = c("Gill", "Gonad", "Liver"),
+                                       ordered = TRUE)
+
+logFC_long_all_gonads %>%
+  ggplot(aes(x = bias_cat, y = tau_gonads, fill = bias)) +
+    geom_violin(position = position_dodge(), draw_quantiles = c(0.5)) +
+    geom_boxplot(width = 0.1, color = "black", 
+                 position = position_dodge(width = 0.9)) +
+    scale_fill_manual(values = my_colors) +
+    facet_grid(. ~ tissue) +
+    theme(panel.grid.major = element_blank(), 
+          panel.grid.minor = element_blank(), 
+          panel.background = element_blank(), 
+          axis.line = element_line(colour = "black")) +
+
+    labs(x="Bias Category", y=expression(tau["TPM"]))  +
+    stat_n_text(data = logFC_long_all_gonads[logFC_long_all_gonads$bias == "FB",],
+                aes(x=bias_cat, y=tau_gonads),
+                hjust = 1.2,
+                #vjust = -2,
+                y.pos = 0.95) +
+    stat_n_text(data = logFC_long_all_gonads[logFC_long_all_gonads$bias == "MB",],
+                aes(x=bias_cat, y=tau_gonads),
+                hjust = -0.2,
+                y.pos = 0,
+                vjust = 2) +
+    stat_n_text(data = logFC_long_all_gonads[logFC_long_all_gonads$bias == "UB",],
+                aes(x=bias_cat, y=tau_gonads),
+                vjust = -4 ) +
+    guides(fill = guide_legend(title = "Bias Level", order = 3))
+
+```
+
+```{r tau-v-FC-MFbias, echo=FALSE, fig.cap="Sex bias (in terms of the absolute value of the log2FoldChange) versus tissue specificity (tau) for all genes that are signifcantly expressed. The fold change in this plot  is a difference bewteen males and females regardless of tissue type.", message=FALSE}
+#Merge the noNA dataset with the tau datasets
+MFbias_tau_all_gonads <- merge(as.data.frame(sex_con_res_noNA), as.data.frame(tau_gonads), by = "row.names")
+
+#Plot logFC against Tau for all of the organs
+plot(sqrt(abs(MFbias_tau_all_gonads$log2FoldChange)),
+     MFbias_tau_all_gonads$tau,
+     pch=19,
+     col = "#20B2AA75",
+     xlab="sex bias (log2 fold change)",
+     ylab=expression(tau["TPM"]))
+
+#Add the best fit line
+abline(lm(MFbias_tau_all_gonads$tau ~ sqrt(abs(MFbias_tau_all_gonads$log2FoldChange))),
+       col="black", lwd = 3, lty = 2)
+
+cor.test(MFbias_tau_all_gonads$tau, 
+         abs(MFbias_tau_all_gonads$log2FoldChange), 
+         method = "spearman")
 ```

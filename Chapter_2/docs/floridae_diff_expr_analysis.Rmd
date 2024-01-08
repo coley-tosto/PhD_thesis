@@ -29,7 +29,6 @@ library(PCAtools)
 library(ggpubr)
 library(cowplot)
 library(UpSetR)
-#library(ComplexUpset)
 library(ggplot2)
 library(kableExtra)
 library(tidyverse)
@@ -58,6 +57,7 @@ samples$rep_fittness <- c(169, 88, 762, 285, 467, 500, 427, 156, 0,
                           169, 88, 762, 916, 285, 467, 500, 427, 156, 0, 
                           169, 88, 762, 916, 0,
                           159, 285, 156, 372, 166)
+
 ```
 
 The package `DESeq2` was used for the differential expression analysis outlined below.
@@ -369,7 +369,8 @@ I have then pulled out all of the male-biased, female-biased, and non-biased gen
 ```{r gill-sex-biased}
 #Removing the rows where padj. is NA in results
 gill_con_res_noNA <- gill_con_res[!is.na(gill_con_res$padj), ]
-summary(gill_con_res_noNA) #We can now see that there are no outliers or low counts since the NAs have been removed
+summary(gill_con_res_noNA) #We can now see that there are no outliers or 
+                           #low counts since the NAs have been removed
 
 #Creating a vector that contains all of the male-biased and female-biased genes in the gills
 gill_mal_biased <- gill_con_res_noNA[which(gill_con_res_noNA$log2FoldChange >= 2 
@@ -414,7 +415,8 @@ top27_FGill_trin_genes <- cbind(rownames(head(gill_con_res_p05[order(
 ### M-F Gonad Comparisson
 ```{r m-f-gonads}
 ##Pulling out the gonad M-F results
-gonad_con_res <- results(ddsMF_FL_exp, contrast = c("group", "MGonad", "FGonad"),
+gonad_con_res <- results(ddsMF_FL_exp, 
+                         contrast = c("group", "MGonad", "FGonad"),
                          alpha = 0.05)
 gonad_con_res$trin_geneid <- rownames(gonad_con_res)
 head(gonad_con_res)
@@ -429,7 +431,8 @@ From the gonad M-F results I have then pulled out all of the male-biased, female
 ```{r gonad-sex-biased}
 #Removing the rows where padj. is NA in results
 gonad_con_res_noNA <- gonad_con_res[!is.na(gonad_con_res$padj), ]
-summary(gonad_con_res_noNA) #We can now see that there are no outliers or low counts since the NAs have been removed
+summary(gonad_con_res_noNA) #We can now see that there are no outliers or 
+                            #low counts since the NAs have been removed
 
 #Creating an object that contains all of the male-biased and female-biased genes in the gonads
 gonad_mal_biased <- gonad_con_res_noNA[which(gonad_con_res_noNA$log2FoldChange >= 2 
@@ -731,7 +734,8 @@ organs <- levels(colData(ddsMF_FL_exp_filtered)$Organ)
 #Create an empty list to store my datasets in
 FL_sex_specific_genes <- list()
 
-#Generate the for loop to identify MSpecific and FSpecific genes in each organ based on Medians
+#Generate the for loop to identify MSpecific and FSpecific genes in each 
+#organ based on Medians
 for(organ in organs){
   
   #Male-Specific Genes
@@ -863,6 +867,48 @@ for(gene in gill_fem_biased_geneIDS){
   
 }
 ```
+
+### Pulling out the gene IDs for all of the sex-specific genes
+```{r}
+#Run once to create the file and then commented out
+#write.table(cbind(rownames(FL_sex_specific_genes$Gill_male_specific)),
+ #           'FL_malG_specific_TRgenes.txt', 
+ #           sep = "", 
+ #           quote=FALSE, 
+ #           row.names = FALSE, 
+ #           col.names = FALSE)
+#write.table(cbind(rownames(FL_sex_specific_genes$Gill_female_specific)),
+ #           'FL_femG_specific_TRgenes.txt', 
+ #           sep = "", 
+ #           quote=FALSE, 
+ #           row.names = FALSE, 
+ #           col.names = FALSE)
+#write.table(cbind(rownames(FL_sex_specific_genes$Gonad_male_specific)),
+ #           'FL_malGon_specific_TRgenes.txt', 
+ #           sep = "", 
+ #           quote=FALSE, 
+ #           row.names = FALSE, 
+ #           col.names = FALSE)
+#write.table(cbind(rownames(FL_sex_specific_genes$Gonad_female_specific)),
+ #           'FL_femGon_specific_TRgenes.txt', 
+ #           sep = "", 
+ #           quote=FALSE, 
+ #           row.names = FALSE, 
+ #           col.names = FALSE)
+#write.table(cbind(rownames(FL_sex_specific_genes$Liver_male_specific)),
+ #           'FL_malL_specific_TRgenes.txt', 
+ #           sep = "", 
+ #           quote=FALSE, 
+ #           row.names = FALSE, 
+ #           col.names = FALSE)
+#write.table(cbind(rownames(FL_sex_specific_genes$Liver_female_specific)),
+ #           'FL_femL_specific_TRgenes.txt', 
+ #           sep = "", 
+ #           quote=FALSE, 
+ #           row.names = FALSE, 
+ #           col.names = FALSE)
+```
+
 
 ## Creating categories and binning the sex-biased genes based on degree of logFC
 This binned was only done on the sex-biased genes, will not have a category for the unbiased genes. The cutoffs for the different groups are as follows:
@@ -1029,6 +1075,7 @@ for(file_name in FL_blast_files){
 
 ### Filtering Blast results
 Because of the way BLAST was run in the RCC, we can have multiple hits for one gene, I want to filter that out so that there is only one hit kept for each gene.
+
 ```{r filter-BLAST}
 #Use lapply to apply the function to each dataset stored in the list created above
 blast_output_filtered <- lapply(FL_blast_list, function(data_frame){
@@ -1112,6 +1159,168 @@ blast_output_filtered$FL_maleG_top50TRgenes_blast <- merge(top50_MGill_df, blast
 blast_output_filtered$FL_maleGon_top50TRgenes_blast <- merge(top50_MGonad_df, blast_output_filtered$FL_maleGon_top50TRgenes_blast, by = "trin_geneid", all.x = TRUE, all.y = TRUE)
 blast_output_filtered$FL_maleL_top50TRgenes_blast <- merge(top50_MLiver_df, blast_output_filtered$FL_maleL_top50TRgenes_blast, by = "trin_geneid", all.x = TRUE, all.y = TRUE)
 ```
+
+### Blasting the sex-specific genes against the _S. scovelli_ genome
+The trinity genes that were pulled out for the sex-specific genes above were blasted with `blastn` against the _Syngnathus scovelli_ genome in the RCC. I then need to load those BLAST results into R, filter them, and pull out what the _S.scovelli_ gene names are that correspond to them. 
+
+First, I read in all of the BLAST results for the sex-specific genes in each organ.
+
+```{r readin_blast_results_SS}
+#Specify the directory where BLAST results are located
+blast_path <- "data/floridae_BLAST/"
+
+#Create a list of the files I want
+FL_blast_files <- list.files(blast_path, pattern = "specific")
+
+#Create an empty list to store my datasets in
+FL_blast_list_sex_specific <- list()
+
+#Create a loop to read in all of the blast results
+for(file_name in FL_blast_files){
+  # Read the file and store it in a new object
+  file_data <- read.delim(file.path(blast_path, file_name), 
+                          stringsAsFactors = FALSE, 
+                          quote = "", 
+                          sep = "\t",
+                          header = FALSE)
+  
+  file_data <- file_data[, c(1:4, 10:16)]
+  
+  #Add column names to the dataset
+  colnames(file_data) <- c("trin_geneid", 
+                           "trin_gene_start", "trin_gene_end", 
+                           "scov_gene_info",
+                           "scov_gene_start", "scov_gene_end", 
+                           "evalue", "bit_score", "length", "pident", 
+                           "gaps")
+
+  # Create a new object with a name based on the file name
+  blast_name <- sub(".txt$", "", file_name) #Removes the file extension
+  FL_blast_list_sex_specific[[blast_name]] <- file_data
+}
+
+```
+
+I then need to filter to make sure each trinity gene only has one hit in the same way I did above.
+
+```{r filter-BLAST-SS}
+#Use lapply to apply the function to each dataset stored in the list created above
+blast_output_filtered_SS <- lapply(FL_blast_list_sex_specific, function(data_frame){
+ 
+  #Pull out the Unique Trinity gene IDs
+  uniqueID <- unique(data_frame[1])
+  
+  #Create an empty dataframe to store intermediate results in
+  output <- data.frame(matrix(data = NA, ncol = ncol(data_frame), nrow = 0))
+  colnames(output) <- c("trin_geneid", "trin_gene_start", "trin_gene_end",
+                        "scov_gene_info", "scov_gene_start", "scov_gene_end", 
+                        "evalue", "bit_score", "length", "pident", "gaps")
+  
+  #Generate a for loop that pulls out the lowest e-value + highest % identity for each gene
+  for(gene in uniqueID$trin_geneid){
+    
+    #Subset the dataset for each Trinity gene
+    this_trin_gene<- subset(data_frame, trin_geneid==gene)
+    #Pull out gene with smallest e-value
+    uni_gene_subset_lowe <- this_trin_gene[which(this_trin_gene$evalue ==
+                                                   min(this_trin_gene$evalue)),]
+    #In case mult. genes have same e-value, pull out gene with highest % identity
+    uni_gene_subset_lowe_highpid <- 
+      uni_gene_subset_lowe[which(uni_gene_subset_lowe$pident ==
+                                   max(uni_gene_subset_lowe$pident)),]
+    
+    # keep only one of multiple identical rows
+    uni_gene_subset_lowe_highpid <- unique(uni_gene_subset_lowe_highpid)
+
+    # check that there is a single gene ID in scovelli, if not, only first row is kept
+    if(length(gsub("^.*(GeneID:\\d+)\\].*$",
+                   "\\1",
+                   uni_gene_subset_lowe_highpid$scov_gene_info))>1){
+      
+      uni_gene_subset_lowe_highpid <- uni_gene_subset_lowe_highpid[1,]
+    }
+    
+    #Add the final gene into the empty dataframe from above
+    output <- rbind(output, uni_gene_subset_lowe_highpid)
+  }
+  
+  return(output)
+})
+
+```
+
+Now I am going to pull out the gene name and protein ID from the "scov_gene_info" column.
+
+```{r}
+for (i in 1:length(blast_output_filtered_SS)) {
+  
+  #Pulling out the gene name and adding it to a new column
+  blast_output_filtered_SS[[i]]$gene <- gsub("^(.*)(gene=)(\\w+\\d*)(.*$)",
+                                             "\\3",
+                                             blast_output_filtered_SS[[i]]$scov_gene_info)
+  
+  #Pulling out the protein name and adding it to a new column
+  blast_output_filtered_SS[[i]]$protein <- gsub("^(.*)(protein=)(.*)([[:graph:]]\\s[[:graph:]])(protein_id=)(.*$)",
+                                                "\\3",
+                                                blast_output_filtered_SS[[i]]$scov_gene_info)
+  
+  
+}
+
+```
+
+```{r long_BLAST}
+#Create a long format dataset that has the tissue information, BLAST gene and protein, 
+#geneID, and sex 
+blast_long_SS <- data.frame(
+  tissue=c(rep("Gill", 
+               sum(nrow(blast_output_filtered_SS$FL_femG_specific_TRgenes_blast),
+                   nrow(blast_output_filtered_SS$FL_malG_specific_TRgenes_blast))),
+           rep("Gonad", 
+               sum(nrow(blast_output_filtered_SS$FL_femGon_specific_TRgenes_blast),
+                   nrow(blast_output_filtered_SS$FL_malGon_specific_TRgenes_blast))),
+           rep("Liver",
+               sum(nrow(blast_output_filtered_SS$FL_femL_specific_TRgenes_blast),
+                   nrow(blast_output_filtered_SS$FL_malL_specific_TRgenes_blast)))
+         ),
+  sex=c(rep("Female",
+            nrow(blast_output_filtered_SS$FL_femG_specific_TRgenes_blast)),
+        rep("Male",
+            nrow(blast_output_filtered_SS$FL_malG_specific_TRgenes_blast)),
+        rep("Female",
+            nrow(blast_output_filtered_SS$FL_femGon_specific_TRgenes_blast)),
+        rep("Male",
+            nrow(blast_output_filtered_SS$FL_malGon_specific_TRgenes_blast)),
+        rep("Female",
+            nrow(blast_output_filtered_SS$FL_femL_specific_TRgenes_blast)),
+        rep("Male",
+            nrow(blast_output_filtered_SS$FL_malL_specific_TRgenes_blast))
+        ),
+  gene=c(blast_output_filtered_SS$FL_femG_specific_TRgenes_blast$gene,
+         blast_output_filtered_SS$FL_malG_specific_TRgenes_blast$gene,
+         blast_output_filtered_SS$FL_femGon_specific_TRgenes_blast$gene,
+         blast_output_filtered_SS$FL_malGon_specific_TRgenes_blast$gene,
+         blast_output_filtered_SS$FL_femL_specific_TRgenes_blast$gene,
+         blast_output_filtered_SS$FL_malL_specific_TRgenes_blast$gene
+         ),
+  protein=c(blast_output_filtered_SS$FL_femG_specific_TRgenes_blast$protein,
+            blast_output_filtered_SS$FL_malG_specific_TRgenes_blast$protein,
+            blast_output_filtered_SS$FL_femGon_specific_TRgenes_blast$protein,
+            blast_output_filtered_SS$FL_malGon_specific_TRgenes_blast$protein,
+            blast_output_filtered_SS$FL_femL_specific_TRgenes_blast$protein,
+            blast_output_filtered_SS$FL_malL_specific_TRgenes_blast$protein
+            ),
+  trinityID=c(blast_output_filtered_SS$FL_femG_specific_TRgenes_blast$trin_geneid,
+              blast_output_filtered_SS$FL_malG_specific_TRgenes_blast$trin_geneid,
+              blast_output_filtered_SS$FL_femGon_specific_TRgenes_blast$trin_geneid,
+              blast_output_filtered_SS$FL_malGon_specific_TRgenes_blast$trin_geneid,
+              blast_output_filtered_SS$FL_femL_specific_TRgenes_blast$trin_geneid,
+              blast_output_filtered_SS$FL_malL_specific_TRgenes_blast$trin_geneid)
+  )
+
+#write.csv(blast_long_SS, "FL_BLAST_results_sex_specific.csv", row.names = FALSE)
+```
+
 
 ### Blasting against the Zebrafish genome
 In order for us to be able to do the GO analysis, we need to BLAST the sequences against one of the PANTHER organisms. The zebrafish, _Danio reiro_ was the only fish in that list.
@@ -1424,31 +1633,193 @@ ggplot(all_go_sums,
         axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 ```
 
+#### Blasting sex-specific genes against the Zebrafish proteome
 
-# Generating the Figures
-```{r fig-1, warning=FALSE}
-plot_grid(pc1v2, pc1v3,
-          nrow = 1,
-          align = "h",
-          labels = c("A", "B"))
+```{r readin_blast_results_dreiro, echo=FALSE}
+#Specify the directory where BLAST results are located
+blast_path <- "data/floridae_BLAST/"
+
+#Create a list of the files I want
+FL_blast_files <- list.files(blast_path, pattern = "danio")
+
+#Create an empty list to store my datasets in
+FL_blast_list_SS_danio <- list()
+
+#Create a loop to read in all of the blast results
+for(file_name in FL_blast_files){
+  # Read the file and store it in a new object
+  file_data <- read.delim(file.path(blast_path, file_name), 
+                          stringsAsFactors = FALSE, quote = "", 
+                          sep = "\t", header = FALSE)
+
+  #Get rid of the columns we don't need
+  file_data <- file_data[,c(1:4,8,10:16)]
+  
+  #Add column names to the dataset
+  colnames(file_data) <- c("trin_geneid", "trin_gene_start", "trin_gene_end",
+                           "reiro_prot_info", "prot_id", "reiro_prot_start",
+                           "reiro_prot_end", "evalue", "bit_score", "length",
+                           "pident", "gaps")
+  
+  # Create a new object with a name based on the file name
+  blast_name <- sub(".txt$", "", file_name) #Removes the file extension
+  FL_blast_list_SS_danio[[blast_name]] <- file_data
+}
 
 ```
 
-```{r fig-2, fig.height=11, fig.width=7}
-p1 <- ggdraw() + draw_image("imgs/FCvbiasFL.png")
-p2 <- ggdraw() + draw_image("imgs/bias_bins_FL.png")
-p3 <- ggdraw() + draw_image("imgs/FL_upsetall.png")
-plot_grid(p1,
-          NULL,
-          p2,
-          NULL,
-          p3,
-          ncol = 1,
-          align = "v",
-          labels = c('(a)',"", "(b)","", "(c)"),
-          #hjust = -3,
-          rel_heights = c(5, 0.2, 4, 0.2, 6))
+```{r filter-BLAST-dreiro, echo=FALSE}
+#Use lapply to apply the function to each dataset stored in the list created above
+blast_output_filtered <- lapply(FL_blast_list_SS_danio, function(data_frame){
+ 
+  #Pull out the Unique Trinity gene IDs
+  uniqueID <- unique(data_frame[1])
+  
+  #Create an empty dataframe to store intermediate results in
+  output <- data.frame(matrix(data = NA, ncol = ncol(data_frame), nrow = 0))
+  colnames(output) <- c("trin_geneid", "trin_gene_start", "trin_gene_end",
+                        "reiro_prot_info", "prot_id", "reiro_prot_start",
+                        "reiro_prot_end", "evalue", "bit_score", "length", 
+                        "pident", "gaps")
+  
+  #Generate a for loop that pulls out the lowest e-value + highest % identity for each gene
+  for(gene in uniqueID$trin_geneid){
+    
+    #Subset the dataset for each Trinity gene
+    this_trin_gene<- subset(data_frame, trin_geneid==gene)
+    #Pull out gene with smallest e-value
+    uni_gene_subset_lowe <- this_trin_gene[which(this_trin_gene$evalue ==
+                                                   min(this_trin_gene$evalue)),]
+    #In case mult. genes have same e-value, pull out gene with highest % identity
+    uni_gene_subset_lowe_highpid <- uni_gene_subset_lowe[
+      which(uni_gene_subset_lowe$pident == 
+              max(uni_gene_subset_lowe$pident)),
+      ]
+    
+    # keep only one of multiple identical rows
+    uni_gene_subset_lowe_highpid <- unique(uni_gene_subset_lowe_highpid)
 
+    # check that there is a single gene ID, if not, only first row is kept
+    if(length(gsub("^.*(GeneID:\\d+)\\].*$","\\1",
+                   uni_gene_subset_lowe_highpid$reiro_prot_info))>1){
+      uni_gene_subset_lowe_highpid<-uni_gene_subset_lowe_highpid[1,]
+    }
+    
+    #Add the final gene into the empty dataframe from above
+    output <- rbind(output, uni_gene_subset_lowe_highpid)
+  }
+  
+  return(output)
+})
 
 ```
 
+In order to run PANTHER we need IDs that follow one of their supported formats. From NCBI, the gene name works (e.g. rpl27). That information is not automatically supplied with the BLAST output, but we can use the .gff file from NCBI to pull out the gene names that correspond to the proteinID (e.g. NP_956018.1).
+
+```{r merge-gff-gene-names}
+#Merge the gene names pulled out above with the rest of the BLAST datasets based on the proteinID
+blast_output_merged <- lapply(blast_output_filtered, function(dataframe){
+  
+   output <- merge(dataframe, unique(genes[,7:8]), by = "prot_id")
+  
+   return(output)
+})
+
+```
+
+```{r, eval=FALSE}
+write.table(c(blast_output_merged$FL_femG_specific_TRgenes_danio_blast$gene_name,
+              blast_output_merged$FL_femGon_specific_TRgenes_danio_blast$gene_name,
+              blast_output_merged$FL_femL_specific_TRgenes_danio_blast$gene_name,
+              blast_output_merged$FL_malG_specific_TRgenes_danio_blast$gene_name,
+              blast_output_merged$FL_malGon_specific_TRgenes_danio_blast$gene_name,
+              blast_output_merged$FL_malL_specific_TRgenes_danio_blast$gene_name),
+           'FL_GOnames_SS.txt', 
+            sep = " ", 
+            quote=FALSE, 
+            row.names = FALSE, 
+            col.names = FALSE)
+```
+
+```{r panther-results-merge}
+panther_SS <- read.delim("data/pantherGeneList_SS.txt", header = FALSE)
+colnames(panther_SS) <- c("GeneID", "MappedID", "GeneName", "pantherFAM", 
+                       "panther_prot_class", "species")
+
+for (i in 1:length(blast_output_merged)) {
+  
+  blast_output_merged[[i]] <- merge(blast_output_merged[[i]],
+                                    panther_SS[, c(2, 5)],
+                                    by.x = "gene_name",
+                                    by.y = "MappedID",
+                                    all.x = TRUE)
+  
+}
+
+```
+
+```{r}
+go_tabs <- lapply(blast_output_merged, function(dat){
+
+  tab <- data.frame(table(dat$panther_prot_class) )
+  tab$Var1 <- as.character(tab$Var1)
+  tab$Var1[tab$Var1==""] <- "Unclassified"
+  #tab$prop <- tab$Freq/sum(tab$Freq)
+
+  return(tab)
+  })
+
+
+all_go_dat <- data.frame(matrix(ncol=4,nrow=0))
+colnames(all_go_dat) <- c(
+  colnames(go_tabs$FL_femG_biased_TRgenes_blast),
+  "bias_cat", "tissue"
+)
+tissues <- c("Gill", "Gonad", "Liver", "Gill", "Gonad", "Liver")
+
+for(i in 1:length(go_tabs)){
+  tmp<-go_tabs[[i]]
+  tmp$cat<-names(go_tabs)[i]
+  tmp$tissue <- tissues[[i]]
+  all_go_dat<-rbind(all_go_dat, tmp)
+}
+
+all_go_sums <- data.frame(matrix(ncol = 4,
+                                 nrow = 0))
+colnames(all_go_sums) <- c("Freq", "prot_class", "tissue", "prop")
+
+for(organ in unique(all_go_dat$tissue)){
+  
+  tmp <- all_go_dat[all_go_dat$tissue == organ, ]
+  go_sums <- as.data.frame(tapply(tmp$Freq, tmp$Var1, sum))
+  go_sums$prot_class <- rownames(go_sums)
+  colnames(go_sums)[1] <- "Freq"
+  go_sums$tissue <- organ
+  rownames(go_sums) <- NULL
+  
+  go_sums$prop <- go_sums$Freq/sum(go_sums$Freq)
+  
+  all_go_sums <- rbind(all_go_sums, go_sums)
+
+}
+
+for(class in unique(all_go_sums$prot_class)){
+  match_rows<-which(all_go_sums$prot_class==class)
+  if(any(all_go_sums$prop[match_rows]>0.02)==FALSE){
+    
+    all_go_sums$prot_class[match_rows]<-"Other"
+  }
+}
+
+# make a barplot somehow
+my_colors <- c("Gonad" = "#EEB422", "Liver" = "#EE8262", "Gill" = "#20B2AA")
+ggplot(all_go_sums, 
+       aes(prot_class, prop, fill = tissue)) +   
+  geom_bar(position = "dodge", stat="identity") +
+  scale_fill_manual(values = my_colors) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black"),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
