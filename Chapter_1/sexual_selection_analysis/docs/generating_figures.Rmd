@@ -15,7 +15,6 @@ knitr::opts_knit$set(root.dir='../')
 
 ```{r loadLibs, message=FALSE, warning=FALSE,eval=TRUE}
 library(spfTools)
-library(DESeq2)
 library(ggplot2)
 library(pheatmap)
 library(magick)
@@ -98,70 +97,47 @@ for (i in 1:length(datasets)) {
 ```{r generate-fig-opp-selection}
 plot(opp_average$Episode_sel, opp_average$Average,
      col=paste0(sex_cols[opp_average$Sex],"75"), type = 'p')
-```
 
-```{r fig1c, message=FALSE}
-bateman <- ggplot(data = fem_succ, aes(x = MatingSuccess, y = relative_fit)) +
-  geom_point(color = paste0(sex_cols["F"],"75"),
-             size = 3) +
-  geom_point(data = mal_succ,
-             color = paste0(sex_cols["M"],"75"),
-             size = 3,
-             aes(x=as.numeric(MatingSuccess)+0.05, y=relative_fit)) +
+pd <- position_dodge(1)
+
+ggplot(opp_average,
+       aes(x = Episode_sel,
+           y = Average,
+           color = Sex,
+           group = Sex)) +
+  geom_errorbar(aes(ymin = Average - Interval,
+                    ymax = Average + Interval),
+                color = "black",
+                width = 0.8,
+                position = pd,
+                size = 1) +
+  facet_grid(. ~ Species) +
+  geom_point(aes(shape = Species),
+             position = pd,
+             size = 4) +
+  xlab("Episode of Selection") +
+  ylab("Average Fitness Value") +
+  scale_color_manual(values = sex_cols) +
   theme(panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank(), 
         panel.background = element_blank(), 
-        axis.line = element_line(colour = "black"),
-        text=element_text(size=16)) +
-  geom_smooth(method = "lm", 
-              mapping = aes(weight = wt_fem, color = "Female"), 
-              se = FALSE, lty = 2) +
-  geom_smooth(data = mal_succ, method = "lm", 
-              mapping = aes(weight = wt_mal, color = "Male"), 
-              fullrange = TRUE, se = FALSE, lty = 2) +
-  labs(x="Number of mates",
-       y="Relative num. eggs") +
-  scale_color_manual(name='',
-                     breaks=c('Female', 'Male'),
-                     values=c('Female'=sex_cols[["F"]], 'Male'=sex_cols[["M"]])) +
-  theme(legend.key=element_blank(),
-        legend.position = "top")
-
+        axis.line = element_line(colour = "black")) +
+  theme(legend.position = "right",
+        legend.key=element_blank(),
+        axis.title.x = element_text(size = 16,
+                                    vjust = -0.5),
+        axis.text.x = element_text(size = 12, family = "serif"),
+        axis.title.y = element_text(size = 16,
+                                    vjust = 2.5),
+        axis.text.y = element_text(size = 12),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12))
 
 ```
 
-### Fig. 1d
 
-```{r fig1b, message=FALSE}
-prop_offspring_no0 <- ggplot(fem_succ[fem_succ$totalEggs != 0,], 
-                             aes(x = MatingSuccess, y = prop_surviving)) +
-  geom_point(color = paste0(sex_cols["F"],"75"), 
-             size = 3) +
-  geom_point(data = mal_succ[mal_succ$totalEggs != 0,], 
-             color = paste0(sex_cols["M"],"75"), 
-             size = 3,
-             aes(x=as.numeric(MatingSuccess)+0.05, y=prop_surviving)) +
-  theme(panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(), 
-        panel.background = element_blank(), 
-        axis.line = element_line(colour = "black"),
-        text=element_text(size=16)) +
-  geom_smooth(method = "lm", 
-              aes(color = "Female"), 
-              se = FALSE, lty = 2, 
-              fullrange=TRUE, show.legend = FALSE) +
-  geom_smooth(data = mal_succ[mal_succ$totalEggs != 0,], 
-              method = "lm", 
-              aes(color = "Male"), 
-              se = FALSE, lty = 2, 
-              fullrange = TRUE, show.legend = FALSE) +
-  labs(x="Number of mates", 
-       y="Prop. surviving offpring") +
-  scale_color_manual(name='',
-                     breaks=c('Female', 'Male'),
-                     values=c('Female'=sex_cols[["F"]], 'Male'=sex_cols[["M"]]))
 
-```
+
 
 ### Fig. 1 Assembly
 
