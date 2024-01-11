@@ -95,12 +95,9 @@ for (i in 1:length(datasets)) {
 ```
 
 ```{r generate-fig-opp-selection}
-plot(opp_average$Episode_sel, opp_average$Average,
-     col=paste0(sex_cols[opp_average$Sex],"75"), type = 'p')
-
 pd <- position_dodge(1)
 
-ggplot(opp_average,
+plot <- ggplot(opp_average,
        aes(x = Episode_sel,
            y = Average,
            color = Sex,
@@ -132,6 +129,9 @@ ggplot(opp_average,
         axis.text.y = element_text(size = 12),
         legend.title = element_text(size = 14),
         legend.text = element_text(size = 12))
+
+plot +
+  geom_hline(yintercept = 0, linetype = "dashed", size = 1)
 
 ```
 

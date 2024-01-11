@@ -188,6 +188,8 @@ for (trial in unique(fem_succ$trial_num)) {
   fem_succ_fitness <- rbind(fem_succ_fitness, tmp)
 }
 
+#Exporting the data
+#write.csv(fem_succ_fitness, "data/scovelli_int_I_fem.csv", row.names = FALSE)
 ```
 
 ```{r opp-selection-males}
@@ -266,6 +268,8 @@ for (trial in unique(mal_succ$trial_num)) {
   mal_succ_fitness <- rbind(mal_succ_fitness, tmp)
 }
 
+#Exporting the data
+#write.csv(mal_succ_fitness, "data/scovelli_int_I_mal.csv", row.names = FALSE)
 ```
 
 ```{r sum-selection-coef, eval=FALSE, include=FALSE}
@@ -275,6 +279,9 @@ opp_selection_episodes_fem$Sex <- "F"
 opp_selection_episodes_mal$Sex <- "M"
 
 opp_selection_episodes_all <- rbind(opp_selection_episodes_fem, opp_selection_episodes_mal)
+
+#Exporting the data
+#write.csv(opp_selection_episodes_all, "data/scovelli_opp_selection.csv", row.names = FALSE)
 
 #Calculating the mean and Confidence intervals for each episode of selection
 #For males and females
@@ -376,6 +383,8 @@ for (trial in unique(fem_succ$trial_num)) {
   fem_succ_select_diff <- rbind(fem_succ_select_diff, tmp)
 }
 
+#Exporting the data
+#write.csv(fem_succ_select_diff, "data/scovelli_int_diff_fem.csv", row.names = FALSE)
 ```
 
 ```{r selection-diff-males}
@@ -440,6 +449,8 @@ for (trial in unique(mal_succ$trial_num)) {
   mal_succ_select_diff <- rbind(mal_succ_select_diff, tmp)
 }
 
+#Exporting the data
+#write.csv(mal_succ_select_diff, "data/scovelli_int_diff_mal.csv", row.names = FALSE)
 ```
 
 ```{r selection-diff-sum, eval=FALSE, include=FALSE}
@@ -448,6 +459,9 @@ select_diff_fem$Sex <- "F"
 select_diff_mal$Sex <- "M"
 
 select_diff_all <- rbind(select_diff_fem, select_diff_mal)
+
+#Exporting the data
+#write.csv(select_diff_all, "data/scovelli_select_diff.csv", row.names = FALSE)
 
 #Confidence intervals - absolute selection differentials
 t_test <- qt(p = 0.975, df = (nrow(select_diff_mal) - 1))

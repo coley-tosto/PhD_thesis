@@ -26,6 +26,8 @@ knitr::opts_knit$set(root.dir='../',
 #This is a cohesive list of all the libraries used in this document
 library(ggplot2)
 library(cowplot)
+library(fBasics)
+
 ```
 
 ``` {r read-data, message = FALSE, warning = FALSE}
@@ -40,6 +42,16 @@ mal_meso <- read.csv("data/all_mal_meso_floridae.csv")
 
 # Calculating the degree of sexual dimorphism
 Other papers have reported varying levels of significant or non-significant size differences between males and females in this species. I want to compare the sizes that I have to see what sexual size dimorphism is like for this population. I am doing this across all fish that were used, including those trials that had no successful matings.
+```{r}
+library(vegan)
+traits<-dplyr::bind_rows(
+  cbind(fem_meso,sex="Female"), 
+  cbind(mal_meso[,1:9],sex="Male")
+              )
+
+vegan::cca(traits[,c("weight","length","depth","svl")]~traits$sex)
+```
+
 
 ```{r sd-test}
 #Testing to see if the variances are equal
@@ -47,8 +59,18 @@ var.test(fem_meso$length, mal_meso$length)
 var.test(fem_meso$depth, mal_meso$depth)
 var.test(fem_meso$svl, mal_meso$svl)
 
+#Testing for normal distribution
+normalTest(fem_meso$length, method = "da") #normal
+normalTest(fem_meso$depth, method = "da") #not normal
+normalTest(fem_meso$svl, method = "da") #normal
+normalTest(mal_meso$length, method = "da") #normal
+normalTest(mal_meso$depth, method = "da") #normal
+normalTest(mal_meso$svl, method = "da") #normal
+
 t.test(fem_meso$length, mal_meso$length, var.equal = TRUE)
+wilcox.test(fem_meso$length, mal_meso$length)
 t.test(fem_meso$depth, mal_meso$depth, var.equal = FALSE)
+wilcox.test(fem_meso$depth, mal_meso$depth)
 t.test(fem_meso$svl, mal_meso$svl, var.equal = FALSE)
 
 #Checking the power
@@ -420,6 +442,8 @@ for (trial in unique(fem_succ$trial_num)) {
   fem_succ_fitness <- rbind(fem_succ_fitness, tmp)
 }
 
+#Exporting the data
+#write.csv(fem_succ_fitness, "data/floridae_int_I_fem.csv", row.names = FALSE)
 ```
 
 ```{r opp-selection-males}
@@ -493,6 +517,8 @@ for (trial in unique(mal_succ$trial_num)) {
   mal_succ_fitness <- rbind(mal_succ_fitness, tmp)
 }
 
+#Exporting the data
+#write.csv(mal_succ_fitness, "data/floridae_int_I_mal.csv", row.names = FALSE)
 ```
 
 ```{r sum-selection-coef, eval=FALSE, include=FALSE}
@@ -502,6 +528,9 @@ opp_selection_episodes_fem$Sex <- "F"
 opp_selection_episodes_mal$Sex <- "M"
 
 opp_selection_episodes_all <- rbind(opp_selection_episodes_fem, opp_selection_episodes_mal)
+
+#Exporting the data
+#write.csv(opp_selection_episodes_all, "data/floridae_opp_selection.csv", row.names = FALSE)
 
 #Playing around with generating an automatic Table
 library(gtsummary)
@@ -617,6 +646,8 @@ for (trial in unique(fem_succ$trial_num)) {
   fem_succ_select_diff <- rbind(fem_succ_select_diff, tmp)
 }
 
+#Exporting the data
+#write.csv(fem_succ_select_diff, "data/floridae_int_diff_fem.csv", row.names = FALSE)
 ```
 
 ```{r selection-diff-males}
@@ -679,6 +710,8 @@ for (trial in unique(mal_succ$trial_num)) {
   mal_succ_select_diff <- rbind(mal_succ_select_diff, tmp)
 }
 
+#Exporting the data
+#write.csv(mal_succ_select_diff, "data/floridae_int_diff_mal.csv", row.names = FALSE)
 ```
 
 ```{r selection-diff-sum, eval=FALSE, include=FALSE}
@@ -687,6 +720,9 @@ select_diff_fem$Sex <- "F"
 select_diff_mal$Sex <- "M"
 
 select_diff_all <- rbind(select_diff_fem, select_diff_mal)
+
+#Exporting the data
+#write.csv(select_diff_all, "data/floridae_select_diff.csv", row.names = FALSE)
 
 #Confidence intervals - absolute selection differentials
 t_test <- qt(p = 0.975, df = (nrow(select_diff_mal) - 1))
