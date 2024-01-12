@@ -80,7 +80,7 @@ wilcox.test(fem_meso$snout_len,
 
 There is a significant difference in all of the morphometrics between males and females, with females being larger in all of the categories. 
 
-It may be that females are just larger in general so that is inflating all of the other metrics, particularly depth. Are females actually deeper than males or are they just longer so the depth follows along suit? To try and address this I am going to adjust the depth by the total length of the fish and then re-run the t-test.
+It may be that females are just larger in general so that is inflating all of the other metrics, particularly depth. Are females actually deeper than males or are they just longer so the depth follows along suit? To try and address this I am going to adjust the depth by the total length of the fish and then re-run the t-test. I am going to do the same thing with snout length
 
 ```{r sd-depth-adj, eval=FALSE}
 #Adjusting the depth by the length
@@ -104,6 +104,32 @@ pool_sd <- sqrt((var(fem_depth_adj, na.rm = TRUE) +
 d <- d_mean/pool_sd
 
 pwr.t.test(n = length(mal_depth_adj), 
+           d = d,
+           sig.level = 0.05,
+           type = 'one.sample',
+           alternative = 'two.sided')
+
+#Adjusting the snout length by the length
+fem_snout_adj <- fem_meso$snout_len/fem_meso$length
+mal_snout_adj <- mal_meso$snout_len/mal_meso$length
+
+#Re-checking assumptions
+var.test(fem_snout_adj, mal_snout_adj) #equal
+normalTest(fem_snout_adj, method = "da") #not normal
+normalTest(mal_snout_adj, method = "da") #not normal
+
+#Running the pairwise test
+wilcox.test(fem_snout_adj, mal_snout_adj)
+
+#Checking the power of the test to ensure we are detecting
+#a true difference
+d_mean <- abs(mean(fem_snout_adj, na.rm = TRUE) -
+                mean(mal_snout_adj))
+pool_sd <- sqrt((var(fem_snout_adj, na.rm = TRUE) +
+                   var(mal_snout_adj))/ 2)
+d <- d_mean/pool_sd
+
+pwr.t.test(n = length(mal_snout_adj), 
            d = d,
            sig.level = 0.05,
            type = 'one.sample',
@@ -840,6 +866,9 @@ for (trial in unique(fem_succ$trial_num)) {
   #Calculate relative fitness
   rel_repo_fitness <- tmp$totalEggs/mean(tmp$totalEggs)
   
+  #Calculte mating fitness
+  rel_mate_succuess <- tmp$MatingSuccess/mean(tmp$MatingSuccess)
+  
   #Column-bind the trial #, Mating success, and calculated rel. fitness
   fitness <- cbind("trial" = rep(trial, nrow(tmp)), 
                    "MatingSuccess" = tmp$MatingSuccess, 
@@ -861,6 +890,9 @@ for (trial in unique(mal_succ$trial_num)) {
   
   #Calculate relative fitness
   rel_repo_fitness <- tmp$totalEggs/mean(tmp$totalEggs)
+  
+  #Calculte mating fitness
+  rel_mate_succuess <- tmp$MatingSuccess/mean(tmp$MatingSuccess)
   
   #Column-bind the trial #, Mating success, and calculated rel. fitness
   fitness <- cbind("trial" = rep(trial, nrow(tmp)), 
@@ -914,6 +946,8 @@ points(mal_bateman$MatingSuccess,
 abline(wls_model_fem, col = "#7fc97f", lwd = 3, lty = 2)
 abline(wls_model_mal, col = "#beaed4", lwd = 3, lty = 2)
 
+write.csv(fem_bateman, file = "data/FU_fem_bateman.csv", row.names = FALSE)
+write.csv(mal_bateman, file = "data/FU_mal_bateman.csv", row.names = FALSE)
 ```
 
 ```{r sum-bateman}

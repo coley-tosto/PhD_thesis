@@ -1,5 +1,5 @@
 ---
-title: 'Syngnathus floridae: figures'
+title: 'Selection in Syngnathus: figures'
 output:
   html_document:
     df_print: paged
@@ -16,7 +16,6 @@ knitr::opts_knit$set(root.dir='../')
 ```{r loadLibs, message=FALSE, warning=FALSE,eval=TRUE}
 library(spfTools)
 library(ggplot2)
-library(pheatmap)
 library(magick)
 library(patchwork)
 library(tidyverse)
@@ -94,10 +93,12 @@ for (i in 1:length(datasets)) {
 
 ```
 
-```{r generate-fig-opp-selection}
+### Figa - average and CIs
+
+```{r generate-figa-opp-selection}
 pd <- position_dodge(1)
 
-plot <- ggplot(opp_average,
+opp_selection_average <- ggplot(opp_average,
        aes(x = Episode_sel,
            y = Average,
            color = Sex,
@@ -107,7 +108,7 @@ plot <- ggplot(opp_average,
                 color = "black",
                 width = 0.8,
                 position = pd,
-                size = 1) +
+                linewidth = 1) +
   facet_grid(. ~ Species) +
   geom_point(aes(shape = Species),
              position = pd,
@@ -130,14 +131,197 @@ plot <- ggplot(opp_average,
         legend.title = element_text(size = 14),
         legend.text = element_text(size = 12))
 
-plot +
+opp_selection_average <- opp_selection_average +
   geom_hline(yintercept = 0, linetype = "dashed", size = 1)
 
 ```
 
 
+### Figb - percents of selection
+```{r calc-opp-percents}
+sexes <- c("M", "F")
+
+#Create a dataframe to store the final values in
+opp_percents <- data.frame(matrix(ncol = 4,
+                                 nrow = 0))
+colnames(opp_percents) <- c("Percent", "Species", "Episode_sel", "Sex")
+
+for (pipefish in species) {
+  
+  tmp <- opp_average[opp_average$Species == pipefish, ]
+  
+  for (sex in sexes) {
+    #browser()
+    
+    tmp_sex <- tmp[tmp$Sex == sex, ]
+    I_average <- tmp_sex$Average[tmp_sex$Episode_sel == "I"]
+    percents <- as.data.frame(t(t(apply(tmp_sex, 1, function(x){
+      
+      (as.numeric(x[1])/I_average)*100
+      
+    }))))
+    
+    colnames(percents) <- "Percent"
+    percents$Species <- pipefish
+    percents$Episode_sel <- tmp_sex$Episode_sel
+    percents$Sex <- sex
+    
+    rownames(percents) <- NULL
+    
+    opp_percents <- rbind(opp_percents, percents)
+    
+  }
+}
+```
+
+```{r generate-figa-opp-selection}
+selection_colors <- c("I_12" = "#9FBCAA", "I_2" = "#F0B67F", "I_3" = "#CD96CD", "I_1" = "#6CA6CD")
+
+opp_selection_per <- ggplot(opp_percents[opp_percents$Episode_sel !="I",], 
+       aes(x = Sex, 
+           y = Percent, 
+           fill = Episode_sel)) +
+  geom_bar(position = "stack", stat = "identity") +
+  facet_grid(. ~ Species) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black")) +
+  scale_fill_manual(values = selection_colors) +
+   theme(legend.position = "right",
+        legend.key=element_blank(),
+        axis.title.x = element_text(size = 16,
+                                    vjust = -0.5),
+        axis.text.x = element_text(size = 12),
+        axis.title.y = element_text(size = 16,
+                                    vjust = 2.5),
+        axis.text.y = element_text(size = 12),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12, family = "serif"))
+
+opp_selection_per
+  
+```
 
 
+### Fig. Opp. selection Assembly
+
+```{r fig-opp-select, message=FALSE}
+fig_opp_select <-wrap_plots(opp_selection_average,
+                            opp_selection_per, 
+                            nrow = 1)
+
+fig_opp_select <- fig_opp_select + plot_annotation(tag_levels = 'A') + 
+  #plot_layout(guides = 'collect',
+              #widths = 1,
+              #heights = c(1,2))  #&
+  theme(#legend.position='top',
+        #legend.text=element_text(size=16),
+        plot.tag = element_text(size = 16))
+
+fig_opp_select
+
+ggsave("figs/fig_opp_select.pdf",fig_opp_select,height = 6, width=16)
+ggsave("figs/fig_opp_select.png",fig_opp_select,height = 6, width=16)
+
+```
+
+```{r showAssembledFig1, eval=TRUE}
+knitr::include_graphics("figs/fig_opp_select.png")
+```
+
+## Figure 1
+
+```{r fig1Data}
+fem_succ<-read.csv("plot_data/fem_matings.csv")
+mal_succ<-read.csv("plot_data/mal_matings.csv")
+
+# get proportion of eggs surviving
+mal_succ$prop_surviving <- ifelse(mal_succ$totalEggs == 0, 0,
+                                  mal_succ$NumDeveloped_Calc/mal_succ$totalEggs)
+fem_succ$prop_surviving <- ifelse(fem_succ$totalEggs == 0, 0,
+                                  fem_succ$NumDeveloped/fem_succ$totalEggs)
+```
+
+### Fig. 1A 
+
+```{r fig1Bateman}
+#Generating Bateman's gradient
+#Define the model
+fem_model <- lm(fem_succ$relative_fit ~ fem_succ$MatingSuccess)
+mal_model <- lm(mal_succ$relative_fit ~ mal_succ$MatingSuccess)
+
+#define weights to use
+wt_fem <- 1 / lm(abs(fem_model$residuals) ~ fem_model$fitted.values)$fitted.values^2
+wt_mal <- 1 / lm(abs(mal_model$residuals) ~ mal_model$fitted.values)$fitted.values^2
+
+#perform weighted least squares regression
+wls_model_fem <- lm(fem_succ$relative_fit ~ fem_succ$MatingSuccess, weights=wt_fem)
+wls_model_mal <- lm(mal_succ$relative_fit ~ mal_succ$MatingSuccess, weights=wt_mal)
+```
+
+```{r fig1c, message=FALSE}
+bateman <- ggplot(data = fem_succ, aes(x = MatingSuccess, y = relative_fit)) +
+  geom_point(color = paste0(sex_cols["F"],"75"),
+             size = 3) +
+  geom_point(data = mal_succ,
+             color = paste0(sex_cols["M"],"75"),
+             size = 3,
+             aes(x=as.numeric(MatingSuccess)+0.05, y=relative_fit)) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black"),
+        text=element_text(size=16)) +
+  geom_smooth(method = "lm", 
+              mapping = aes(weight = wt_fem, color = "Female"), 
+              se = FALSE, lty = 2) +
+  geom_smooth(data = mal_succ, method = "lm", 
+              mapping = aes(weight = wt_mal, color = "Male"), 
+              fullrange = TRUE, se = FALSE, lty = 2) +
+  labs(x="Number of mates",
+       y="Relative num. eggs") +
+  scale_color_manual(name='',
+                     breaks=c('Female', 'Male'),
+                     values=c('Female'=sex_cols[["F"]], 'Male'=sex_cols[["M"]])) +
+  theme(legend.key=element_blank(),
+        legend.position = "top")
+
+
+```
+
+### Fig. 1d
+
+```{r fig1b, message=FALSE}
+prop_offspring_no0 <- ggplot(fem_succ[fem_succ$totalEggs != 0,], 
+                             aes(x = MatingSuccess, y = prop_surviving)) +
+  geom_point(color = paste0(sex_cols["F"],"75"), 
+             size = 3) +
+  geom_point(data = mal_succ[mal_succ$totalEggs != 0,], 
+             color = paste0(sex_cols["M"],"75"), 
+             size = 3,
+             aes(x=as.numeric(MatingSuccess)+0.05, y=prop_surviving)) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black"),
+        text=element_text(size=16)) +
+  geom_smooth(method = "lm", 
+              aes(color = "Female"), 
+              se = FALSE, lty = 2, 
+              fullrange=TRUE, show.legend = FALSE) +
+  geom_smooth(data = mal_succ[mal_succ$totalEggs != 0,], 
+              method = "lm", 
+              aes(color = "Male"), 
+              se = FALSE, lty = 2, 
+              fullrange = TRUE, show.legend = FALSE) +
+  labs(x="Number of mates", 
+       y="Prop. surviving offpring") +
+  scale_color_manual(name='',
+                     breaks=c('Female', 'Male'),
+                     values=c('Female'=sex_cols[["F"]], 'Male'=sex_cols[["M"]]))
+
+```
 
 ### Fig. 1 Assembly
 

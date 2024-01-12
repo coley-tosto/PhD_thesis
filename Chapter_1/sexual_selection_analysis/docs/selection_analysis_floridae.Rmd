@@ -60,16 +60,14 @@ var.test(fem_meso$depth, mal_meso$depth)
 var.test(fem_meso$svl, mal_meso$svl)
 
 #Testing for normal distribution
-normalTest(fem_meso$length, method = "da") #normal
+normalTest(fem_meso$length, method = "da") #not normal
 normalTest(fem_meso$depth, method = "da") #not normal
 normalTest(fem_meso$svl, method = "da") #normal
 normalTest(mal_meso$length, method = "da") #normal
 normalTest(mal_meso$depth, method = "da") #normal
 normalTest(mal_meso$svl, method = "da") #normal
 
-t.test(fem_meso$length, mal_meso$length, var.equal = TRUE)
 wilcox.test(fem_meso$length, mal_meso$length)
-t.test(fem_meso$depth, mal_meso$depth, var.equal = FALSE)
 wilcox.test(fem_meso$depth, mal_meso$depth)
 t.test(fem_meso$svl, mal_meso$svl, var.equal = FALSE)
 
@@ -89,6 +87,8 @@ pwr.t.test(n = nrow(fem_meso),
 fem_depth_adj <- fem_meso$depth/fem_meso$svl
 mal_depth_adj <- mal_meso$depth/mal_meso$svl
 var.test(fem_depth_adj, mal_depth_adj)
+normalTest(fem_depth_adj, method = "da") #normal
+normalTest(mal_depth_adj, method = "da") #normal
 t.test(fem_depth_adj, mal_depth_adj, var.equal = TRUE)
 
 d_mean <- abs(mean(fem_depth_adj, na.rm = TRUE) - mean(mal_depth_adj))
@@ -796,9 +796,12 @@ for (trial in unique(fem_succ$trial_num)) {
   #Calculate relative fitness
   rel_repo_fitness <- tmp$totalEggs/mean(tmp$totalEggs)
   
+  #Calculte mating fitness
+  rel_mate_succuess <- tmp$MatingSuccess/mean(tmp$MatingSuccess)
+  
   #Column-bind the trial #, Mating success, and calculated rel. fitness
   fitness <- cbind("trial" = rep(trial, nrow(tmp)), 
-                   "MatingSuccess" = tmp$MatingSuccess, 
+                   "MatingSuccess" = rel_mate_succuess, 
                    rel_repo_fitness)
   
   #Add this chunk of data to the dataframe we created
@@ -818,9 +821,12 @@ for (trial in unique(mal_succ$trial_num)) {
   #Calculate relative fitness
   rel_repo_fitness <- tmp$totalEggs/mean(tmp$totalEggs)
   
+  #Calculte mating fitness
+  rel_mate_succuess <- tmp$MatingSuccess/mean(tmp$MatingSuccess)
+  
   #Column-bind the trial #, Mating success, and calculated rel. fitness
   fitness <- cbind("trial" = rep(trial, nrow(tmp)), 
-                   "MatingSuccess" = tmp$MatingSuccess, 
+                   "MatingSuccess" = rel_mate_succuess, 
                    rel_repo_fitness)
   
   #Add this chunk of data to the dataframe we created
@@ -870,6 +876,8 @@ points(mal_bateman$MatingSuccess,
 abline(wls_model_fem, col = "#7fc97f", lwd = 3, lty = 2)
 abline(wls_model_mal, col = "#beaed4", lwd = 3, lty = 2)
 
+write.csv(fem_bateman, file = "data/FL_fem_bateman.csv", row.names = FALSE)
+write.csv(mal_bateman, file = "data/FL_mal_bateman.csv", row.names = FALSE)
 ```
 
 ```{r sum-bateman}

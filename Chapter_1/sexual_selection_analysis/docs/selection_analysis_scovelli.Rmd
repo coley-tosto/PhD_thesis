@@ -36,6 +36,26 @@ mal_meso <- read.csv("data/all_mal_meso_scovelli.csv")
 
 ```
 
+# Calculating the degree of sexual dimorphism
+
+```{r sd-assumption-test, eval=FALSE}
+#Testing to see if the variances are equal
+var.test(fem_meso$length, mal_meso$length) #not equal
+
+#Testing for normal distribution
+normalTest(fem_meso$length, method = "da") #normal
+normalTest(mal_meso$length, method = "da") #normal
+
+```
+
+Variances are not equal but they are normally distributed so I will run a t-test with unequal variances.
+
+```{r sd-t-tests, eval=FALSE}
+t.test(fem_meso$length, mal_meso$length, 
+       var.equal = FALSE) #Sig. difference
+
+```
+
 
 # Cleaning the datasets
 For the male dataset I want to do a few things before using it: 
