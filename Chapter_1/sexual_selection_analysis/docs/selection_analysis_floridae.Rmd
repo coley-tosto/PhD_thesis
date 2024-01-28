@@ -84,8 +84,8 @@ pwr.t.test(n = nrow(fem_meso),
 ```
 
 ```{r}
-fem_depth_adj <- fem_meso$depth/fem_meso$svl
-mal_depth_adj <- mal_meso$depth/mal_meso$svl
+fem_depth_adj <- fem_meso$depth/fem_meso$length
+mal_depth_adj <- mal_meso$depth/mal_meso$length
 var.test(fem_depth_adj, mal_depth_adj)
 normalTest(fem_depth_adj, method = "da") #normal
 normalTest(mal_depth_adj, method = "da") #normal
@@ -98,7 +98,7 @@ library(pwr)
 pwr.t.test(n = length(mal_depth_adj), 
            d = d,
            sig.level = 0.05,
-           type = 'one.sample',
+           type = 'two.sample',
            alternative = 'two.sided')
 ```
 
@@ -288,8 +288,10 @@ abline(lm(mated_fem$totalEggs ~ mated_fem$svl), lwd = 3, lty = 2)
 There may be some correlation happening here, but it doesn't look particularly strong (Fig. \@ref(fig:em-v-fem-size)). Let's run some correlations tests to see what they say.
 
 ```{r eggs-fem-size-cor, echo=FALSE}
+mated_fem$depth_adj <- mated_fem$depth/mated_fem$length
+
 cor.test(mated_fem$length, as.numeric(mated_fem$totalEggs))
-cor.test(mated_fem$depth, as.numeric(mated_fem$totalEggs))
+cor.test(mated_fem$depth_adj, as.numeric(mated_fem$totalEggs))
 cor.test(mated_fem$svl, as.numeric(mated_fem$totalEggs))
 
 ```
@@ -330,12 +332,34 @@ boxplot(mal_succ$weight ~ mal_succ$preg_status,
 ```
 
 ```{r mat-stat-stat-mal, echo=FALSE, warning=FALSE}
-wilcox.test(mal_succ$length ~ mal_succ$preg_status)
-wilcox.test(mal_succ$depth ~ mal_succ$preg_status)
-wilcox.test(mal_succ$svl ~ mal_succ$preg_status)
-wilcox.test(as.numeric(mal_succ$bp_area) ~ mal_succ$preg_status)
-wilcox.test(mal_succ$bp_length ~ mal_succ$preg_status)
-wilcox.test(mal_succ$weight ~ mal_succ$preg_status)
+mal_succ$depth_adj <- mal_succ$depth/mal_succ$length
+var.test(mal_succ$length ~ mal_succ$preg_status) #equal
+var.test(mal_succ$depth_adj ~ mal_succ$preg_status) #equal
+var.test(mal_succ$svl ~ mal_succ$preg_status) #equal
+var.test(as.numeric(mal_succ$bp_area) ~ mal_succ$preg_status) #equal
+var.test(mal_succ$bp_length ~ mal_succ$preg_status) #equal
+var.test(mal_succ$weight ~ mal_succ$preg_status) #equal
+
+normalTest(mal_succ$length, method = "da") #normal
+normalTest(mal_succ$depth_adj, method = "da") #normal
+normalTest(mal_succ$svl, method = "da") #normal
+normalTest(as.numeric(mal_succ$bp_area), method = "da") #normal
+normalTest(mal_succ$bp_length, method = "da") #normal
+normalTest(mal_succ$weight, method = "da") #normal
+
+
+t.test(mal_succ$length ~ mal_succ$preg_status,
+       var.equal = TRUE)
+t.test(mal_succ$depth_adj ~ mal_succ$preg_status,
+       var.equal = TRUE)
+t.test(mal_succ$svl ~ mal_succ$preg_status,
+       var.equal = TRUE)
+t.test(as.numeric(mal_succ$bp_area) ~ mal_succ$preg_status,
+       var.equal = TRUE)
+t.test(mal_succ$bp_length ~ mal_succ$preg_status,
+       var.equal = TRUE)
+t.test(mal_succ$weight ~ mal_succ$preg_status,
+       var.equal = TRUE)
 ```
 
 ## Females
@@ -361,12 +385,26 @@ boxplot(fem_succ$weight ~ fem_succ$mated,
 ```
 
 ```{r mat-stat-stat-fem, echo=FALSE, warning=FALSE}
-wilcox.test(fem_succ$length ~ fem_succ$mated)
-t.test(fem_succ$length ~ fem_succ$mated, var.equal = FALSE)
-wilcox.test(fem_succ$depth ~ fem_succ$mated)
-t.test(fem_succ$depth ~ fem_succ$mated, var.equal = FALSE)
-wilcox.test(fem_succ$svl ~ fem_succ$mated)
-wilcox.test(fem_succ$weight ~ fem_succ$mated)
+fem_succ$depth_adj <- fem_succ$depth/fem_succ$length
+
+var.test(fem_succ$length ~ fem_succ$mated) #equal
+var.test(fem_succ$depth_adj ~ fem_succ$mated) #equal
+var.test(fem_succ$svl ~ fem_succ$mated) #equal
+var.test(fem_succ$weight ~ fem_succ$mated) #not equal
+
+normalTest(fem_succ$length, method = "da") #normal
+normalTest(fem_succ$depth_adj, method = "da") #normal
+normalTest(fem_succ$svl, method = "da") #normal
+normalTest(fem_succ$weight, method = "da") #normal
+
+t.test(fem_succ$length ~ fem_succ$mated, 
+       var.equal = TRUE)
+t.test(fem_succ$depth_adj ~ fem_succ$mated, 
+       var.equal = TRUE)
+t.test(fem_succ$svl ~ fem_succ$mated, 
+       var.equal = TRUE)
+t.test(fem_succ$weight ~ fem_succ$mated,
+       var.equal = TRUE)
 ```
 
 # Episode of Sexual Selection
@@ -684,12 +722,12 @@ for (trial in unique(mal_succ$trial_num)) {
                      0)
   
   #Standardizing the trait value to have a mean of 0 and sd of unity
-  tmp$StdLength <- (tmp$svl - mean(tmp$svl))/sd(tmp$svl)
+  tmp$StdLength <- (tmp$length - mean(tmp$length))/sd(tmp$length)
   
   #Calculating the absolute selection differentials (s)
-  s1 <- cov(tmp$svl, tmp$fit1)
-  s12 <- cov(tmp$svl, tmp$fit2)
-  s123 <- cov(tmp$svl, tmp$fit3)
+  s1 <- cov(tmp$length, tmp$fit1)
+  s12 <- cov(tmp$length, tmp$fit2)
+  s123 <- cov(tmp$length, tmp$fit3)
   s2 <- s12 - s1
   s3 <- s123 - s12
   
