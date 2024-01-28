@@ -1,0 +1,55 @@
+---
+title: "Tissue Specificity in _Syngnathus scovelli_"
+author: "Coley Tosto"
+date: "`r Sys.Date()`"
+output:
+  bookdown::pdf_document2:
+    fig_caption: yes
+    keep_tex: yes
+    number_sections: no
+    toc: false
+header-includes: >
+  \usepackage{lipsum}
+  \usepackage{float}
+  \floatplacement{figure}{H}
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir='../',
+                     fig_path="../imgs/")
+```
+
+``` {r library, message = FALSE, warning = FALSE}
+#This is a cohesive list of all the libraries used in this document
+library(DESeq2)
+
+```
+
+``` {r read-data, message = FALSE, warning = FALSE}
+#The abundance matrix generated via salmon and tximport to be used for the DE analysis
+txi.salmon <- readRDS("data/txi.salmon_SS.RDS")
+
+#The samples file generated for tximport
+samples <- read.table("SS_samples.txt", header = TRUE)
+
+samples$group <- factor(paste0(samples$Sex, samples$Organ))
+
+#Changing "Gonad" to be more specific to testis or ovaries
+samples$Organ <- ifelse(samples$Sex == "F" & samples$Organ =="Gonad",
+                        paste0("Ovaries"),
+                        ifelse(samples$Sex == "M" & samples$Organ == "Gonad",
+                               paste0("Testis"),
+                               paste0(samples$Organ))
+                        )
+
+#Make sure the conditions are in the samples file as a factor
+samples$Sex <- as.factor(samples$Sex)
+samples$Organ <- as.factor(samples$Organ)
+
+#Format colData to be used in the tau function
+colData <- as.data.frame(samples)
+rownames(colData) <- samples$ID
+
+```
