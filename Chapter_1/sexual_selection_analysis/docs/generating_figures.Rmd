@@ -120,7 +120,7 @@ opp_selection_average <- ggplot(opp_average,
         panel.grid.minor = element_blank(), 
         panel.background = element_blank(), 
         axis.line = element_line(colour = "black")) +
-  theme(legend.position = "right",
+  theme(legend.position = "bottom",
         legend.key=element_blank(),
         axis.title.x = element_text(size = 16,
                                     vjust = -0.5),
@@ -215,13 +215,13 @@ fig_opp_select <- fig_opp_select + plot_annotation(tag_levels = 'A') +
   #plot_layout(guides = 'collect',
               #widths = 1,
               #heights = c(1,2))  #&
-  theme(#legend.position='top',
+  theme(legend.position='bottom',
         #legend.text=element_text(size=16),
         plot.tag = element_text(size = 16))
 
 fig_opp_select
 
-ggsave("figs/fig_opp_select.pdf",fig_opp_select,height = 6, width=16)
+ggsave("figs/fig_opp_select.pdf",fig_opp_select,height = 6, width=12)
 ggsave("figs/fig_opp_select.png",fig_opp_select,height = 6, width=16)
 
 ```
@@ -230,57 +230,238 @@ ggsave("figs/fig_opp_select.png",fig_opp_select,height = 6, width=16)
 knitr::include_graphics("figs/fig_opp_select.png")
 ```
 
-## Figure 1
 
-```{r fig1Data}
-fem_succ<-read.csv("plot_data/fem_matings.csv")
-mal_succ<-read.csv("plot_data/mal_matings.csv")
+## Figure - Selection Differentials
 
-# get proportion of eggs surviving
-mal_succ$prop_surviving <- ifelse(mal_succ$totalEggs == 0, 0,
-                                  mal_succ$NumDeveloped_Calc/mal_succ$totalEggs)
-fem_succ$prop_surviving <- ifelse(fem_succ$totalEggs == 0, 0,
-                                  fem_succ$NumDeveloped/fem_succ$totalEggs)
+```{r fig-select-diff-Data}
+#Read in the data corresponding to the plots
+fl_sd <- read.csv("data/floridae_select_diff.csv")
+fu_sd <- read.csv("data/fuscus_select_diff.csv")
+ss_sd <- read.csv("data/scovelli_select_diff.csv")
+
+#create a vector containing the names of the datasets
+datasets_sd <- list(fl_sd, fu_sd, ss_sd)
+species <- c("Floridae", "Fuscus", "Scovelli")
+
+#List the columns of interest
+columns <- c("s1", "s2", "s3", "s123",
+             "s1_prime", "s2_prime", "s3_prime", "s123_prime")
+
+#Create a dataframe to store the final values in
+sd_average <- data.frame(matrix(ncol = 5,
+                                nrow = 0))
+colnames(sd_average) <- c("Average", "Interval", "Species", "Select_diff", "Sex")
+
+#Calculating the averages and confidence intervals for each species and 
+#selection differential
+for (i in 1:length(datasets_sd)) {
+  
+  tmp <- datasets_sd[[i]]
+  
+  #Calculate the critical value
+  crit <- qt(p = 0.975, df = (nrow(tmp[tmp$Sex == "F",]) - 1))
+  
+  for (j in 1:length(columns)) {
+    
+    col_name <- columns[[j]]
+    
+    #Calculate the means
+    mean <- t(t(tapply(tmp[, colnames(tmp) == col_name], tmp$Sex, mean)))
+    
+    #Calculate standard error
+    se <- t(t(tapply(tmp[, colnames(tmp) == col_name], tmp$Sex, 
+                 function(x){
+                   sqrt(var(x))/sqrt(length(x))
+                 })))
+    
+    #Calculate the value that is added and subtracted from the mean
+    int <- se*crit
+    
+    #Combine the data together
+    episode <- as.data.frame(cbind(mean, int))
+    colnames(episode) <- c("Average", "Interval")
+    
+    episode$Species <- species[[i]]
+    episode$Select_diff <- col_name
+    episode$Sex <- rownames(episode)
+    
+    rownames(episode) <- NULL
+    
+    sd_average <- rbind(sd_average, episode)
+    
+  }
+}
+
 ```
 
-### Fig. 1A 
+### Figa - average and CIs absolute select differential
 
-```{r fig1Bateman}
+```{r generate-figa-select-diff}
+pd <- position_dodge(1)
+
+select_diff_average <- ggplot(sd_average[sd_average$Select_diff %in% 
+                                           c("s1", "s2", "s3", "s123"),],
+       aes(x = Select_diff,
+           y = Average,
+           color = Sex,
+           group = Sex)) +
+  geom_errorbar(aes(ymin = Average - Interval,
+                    ymax = Average + Interval),
+                color = "black",
+                width = 0.8,
+                position = pd,
+                linewidth = 1) +
+  facet_grid(. ~ Species) +
+  geom_point(aes(shape = Species),
+             position = pd,
+             size = 4) +
+  xlab("Absolute Selection Differential") +
+  ylab("Average value across trials") +
+  scale_color_manual(values = sex_cols) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black")) +
+  theme(legend.position = "bottom",
+        legend.key=element_blank(),
+        axis.title.x = element_text(size = 16,
+                                    vjust = -0.5),
+        axis.text.x = element_text(size = 12, family = "serif"),
+        axis.title.y = element_text(size = 16,
+                                    vjust = 2.5),
+        axis.text.y = element_text(size = 12),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12))
+
+select_diff_average <- select_diff_average +
+  geom_hline(yintercept = 0, linetype = "dashed", linewidth = 1)
+
+```
+
+
+### Figa - average and CIs standardized select differential
+
+```{r generate-figa-select-diff-rel}
+select_diff_p_average <- ggplot(sd_average[sd_average$Select_diff %in% 
+                                           c("s1_prime", "s2_prime", 
+                                             "s3_prime", "s123_prime"),],
+       aes(x = Select_diff,
+           y = Average,
+           color = Sex,
+           group = Sex)) +
+  geom_errorbar(aes(ymin = Average - Interval,
+                    ymax = Average + Interval),
+                color = "black",
+                width = 0.8,
+                position = pd,
+                linewidth = 1) +
+  facet_grid(. ~ Species) +
+  geom_point(aes(shape = Species),
+             position = pd,
+             size = 4) +
+  xlab("Standardized Selection Differential") +
+  ylab("Average value across trials") +
+  scale_color_manual(values = sex_cols) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black")) +
+  theme(legend.position = "right",
+        legend.key=element_blank(),
+        axis.title.x = element_text(size = 16,
+                                    vjust = -0.5),
+        axis.text.x = element_text(size = 12, family = "serif"),
+        axis.title.y = element_text(size = 16,
+                                    vjust = 2.5),
+        axis.text.y = element_text(size = 12),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12))
+
+select_diff_p_average <- select_diff_p_average +
+  geom_hline(yintercept = 0, linetype = "dashed", linewidth = 1)
+
+```
+
+
+### Fig. Opp. selection Assembly
+
+```{r fig-opp-select, message=FALSE}
+fig_opp_select <-wrap_plots(opp_selection_average,
+                            opp_selection_per, 
+                            nrow = 1)
+
+fig_opp_select <- fig_opp_select + plot_annotation(tag_levels = 'A') + 
+  #plot_layout(guides = 'collect',
+              #widths = 1,
+              #heights = c(1,2))  #&
+  theme(legend.position='bottom',
+        #legend.text=element_text(size=16),
+        plot.tag = element_text(size = 16))
+
+fig_opp_select
+
+ggsave("figs/fig_opp_select.pdf",fig_opp_select,height = 6, width=12)
+ggsave("figs/fig_opp_select.png",fig_opp_select,height = 6, width=16)
+
+```
+
+```{r showAssembledFig1, eval=TRUE}
+knitr::include_graphics("figs/fig_opp_select.png")
+```
+
+## Figure Batemans
+
+```{r fig-bate-data}
+fem_batemanFL <- read.csv("data/FL_fem_bateman.csv")
+mal_batemanFL <- read.csv("data/FL_mal_bateman.csv")
+
+fem_batemanFU <- read.csv("data/FU_fem_bateman.csv")
+mal_batemanFU <- read.csv("data/FU_mal_bateman.csv")
+
+fem_batemanSS <- read.csv("data/SS_fem_bateman.csv")
+mal_batemanSS <- read.csv("data/SS_mal_bateman.csv")
+
+```
+
+### Fig.a - c batemans 
+
+```{r figBateman-FL}
 #Generating Bateman's gradient
 #Define the model
-fem_model <- lm(fem_succ$relative_fit ~ fem_succ$MatingSuccess)
-mal_model <- lm(mal_succ$relative_fit ~ mal_succ$MatingSuccess)
+fem_modelFL <- lm(fem_batemanFL$rel_repo_fitness ~ fem_batemanFL$MatingSuccess)
+mal_modelFL <- lm(mal_batemanFL$rel_repo_fitness ~ mal_batemanFL$MatingSuccess)
 
 #define weights to use
-wt_fem <- 1 / lm(abs(fem_model$residuals) ~ fem_model$fitted.values)$fitted.values^2
-wt_mal <- 1 / lm(abs(mal_model$residuals) ~ mal_model$fitted.values)$fitted.values^2
+wt_femFL <- 1 / lm(abs(fem_modelFL$residuals) ~ fem_modelFL$fitted.values)$fitted.values^2
+wt_malFL <- 1 / lm(abs(mal_modelFL$residuals) ~ mal_modelFL$fitted.values)$fitted.values^2
 
-#perform weighted least squares regression
-wls_model_fem <- lm(fem_succ$relative_fit ~ fem_succ$MatingSuccess, weights=wt_fem)
-wls_model_mal <- lm(mal_succ$relative_fit ~ mal_succ$MatingSuccess, weights=wt_mal)
 ```
 
-```{r fig1c, message=FALSE}
-bateman <- ggplot(data = fem_succ, aes(x = MatingSuccess, y = relative_fit)) +
+```{r figbateman-FL, message=FALSE}
+batemanFL <- ggplot(data = fem_batemanFL, 
+                    aes(x = MatingSuccess, 
+                        y = rel_repo_fitness)) +
   geom_point(color = paste0(sex_cols["F"],"75"),
              size = 3) +
-  geom_point(data = mal_succ,
+  geom_point(data = mal_batemanFL,
              color = paste0(sex_cols["M"],"75"),
              size = 3,
-             aes(x=as.numeric(MatingSuccess)+0.05, y=relative_fit)) +
+             aes(x=as.numeric(MatingSuccess) + 0.05, 
+                 y=rel_repo_fitness)) +
   theme(panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank(), 
         panel.background = element_blank(), 
         axis.line = element_line(colour = "black"),
         text=element_text(size=16)) +
   geom_smooth(method = "lm", 
-              mapping = aes(weight = wt_fem, color = "Female"), 
+              mapping = aes(weight = wt_femFL,
+                            color = "Female"), 
               se = FALSE, lty = 2) +
-  geom_smooth(data = mal_succ, method = "lm", 
-              mapping = aes(weight = wt_mal, color = "Male"), 
+  geom_smooth(data = mal_batemanFL, method = "lm", 
+              mapping = aes(weight = wt_malFL, color = "Male"), 
               fullrange = TRUE, se = FALSE, lty = 2) +
-  labs(x="Number of mates",
-       y="Relative num. eggs") +
+  labs(x="Relative Mating Success",
+       y="Relative Reproductive Success") +
   scale_color_manual(name='',
                      breaks=c('Female', 'Male'),
                      values=c('Female'=sex_cols[["F"]], 'Male'=sex_cols[["M"]])) +
@@ -290,14 +471,130 @@ bateman <- ggplot(data = fem_succ, aes(x = MatingSuccess, y = relative_fit)) +
 
 ```
 
-### Fig. 1d
+```{r figBateman-FU}
+#Generating Bateman's gradient
+#Define the model
+fem_modelFU <- lm(fem_batemanFU$rel_repo_fitness ~ fem_batemanFU$MatingSuccess)
+mal_modelFU <- lm(mal_batemanFU$rel_repo_fitness ~ mal_batemanFU$MatingSuccess)
 
-```{r fig1b, message=FALSE}
-prop_offspring_no0 <- ggplot(fem_succ[fem_succ$totalEggs != 0,], 
-                             aes(x = MatingSuccess, y = prop_surviving)) +
+#define weights to use
+wt_femFU <- 1 / lm(abs(fem_modelFU$residuals) ~ fem_modelFU$fitted.values)$fitted.values^2
+wt_malFU <- 1 / lm(abs(mal_modelFU$residuals) ~ mal_modelFU$fitted.values)$fitted.values^2
+
+```
+
+```{r figbateman-FU, message=FALSE}
+batemanFU <- ggplot(data = fem_batemanFU, 
+                    aes(x = MatingSuccess, 
+                        y = rel_repo_fitness)) +
+  geom_point(color = paste0(sex_cols["F"],"75"),
+             size = 3) +
+  geom_point(data = mal_batemanFU,
+             color = paste0(sex_cols["M"],"75"),
+             size = 3,
+             aes(x=as.numeric(MatingSuccess) + 0.05, 
+                 y=rel_repo_fitness)) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black"),
+        text=element_text(size=16)) +
+  geom_smooth(method = "lm", 
+              mapping = aes(weight = wt_femFU,
+                            color = "Female"), 
+              se = FALSE, lty = 2) +
+  geom_smooth(data = mal_batemanFU, method = "lm", 
+              mapping = aes(weight = wt_malFU, color = "Male"), 
+              fullrange = TRUE, se = FALSE, lty = 2) +
+  labs(x="Relative Mating Success",
+       y="") +
+  scale_color_manual(name='',
+                     breaks=c('Female', 'Male'),
+                     values=c('Female'=sex_cols[["F"]], 'Male'=sex_cols[["M"]])) +
+  theme(legend.key=element_blank(),
+        legend.position = "top")
+```
+
+```{r figBateman-SS}
+#Generating Bateman's gradient
+#Define the model
+fem_modelSS <- lm(fem_batemanSS$rel_repo_fitness ~ fem_batemanSS$MatingSuccess)
+mal_modelSS <- lm(mal_batemanSS$rel_repo_fitness ~ mal_batemanSS$MatingSuccess)
+
+#define weights to use
+wt_femSS <- 1 / lm(abs(fem_modelSS$residuals) ~ fem_modelSS$fitted.values)$fitted.values^2
+wt_malSS <- 1 / lm(abs(mal_modelSS$residuals) ~ mal_modelSS$fitted.values)$fitted.values^2
+
+```
+
+```{r figbateman-SS, message=FALSE}
+batemanSS <- ggplot(data = fem_batemanSS, 
+                    aes(x = MatingSuccess, 
+                        y = rel_repo_fitness)) +
+  geom_point(color = paste0(sex_cols["F"],"75"),
+             size = 3) +
+  geom_point(data = mal_batemanSS,
+             color = paste0(sex_cols["M"],"75"),
+             size = 3,
+             aes(x=as.numeric(MatingSuccess) + 0.05, 
+                 y=rel_repo_fitness)) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black"),
+        text=element_text(size=16)) +
+  geom_smooth(method = "lm", 
+              mapping = aes(weight = wt_femSS,
+                            color = "Female"), 
+              se = FALSE, lty = 2) +
+  geom_smooth(data = mal_batemanSS, method = "lm", 
+              mapping = aes(weight = wt_malSS, color = "Male"), 
+              fullrange = TRUE, se = FALSE, lty = 2) +
+  labs(x="Relative Mating Success",
+       y="") +
+  scale_color_manual(name='',
+                     breaks=c('Female', 'Male'),
+                     values=c('Female'=sex_cols[["F"]], 'Male'=sex_cols[["M"]])) +
+  theme(legend.key=element_blank(),
+        legend.position = "top")
+```
+
+### Fig. d - e proportion surviving
+
+```{r figprop-data}
+mal_succFL <- read.csv("data/floridae_int_diff_mal.csv")
+fem_succFL <- read.csv("data/floridae_int_diff_fem.csv")
+
+mal_succFU <- read.csv("data/fuscus_int_diff_mal.csv")
+fem_succFU <- read.csv("data/fuscus_int_diff_fem.csv")
+
+mal_succSS <- read.csv("data/scovelli_int_diff_mal.csv")
+fem_succSS <- read.csv("data/scovelli_int_I_fem.csv")
+
+# get proportion of eggs surviving
+mal_succFL$prop_surviving <- ifelse(mal_succFL$totalEggs == 0, 0,
+                                  mal_succFL$NumDeveloped_Calc/mal_succFL$totalEggs)
+fem_succFL$prop_surviving <- ifelse(fem_succFL$totalEggs == 0, 0,
+                                  fem_succFL$NumDeveloped/fem_succFL$totalEggs)
+
+mal_succFU$prop_surviving <- ifelse(mal_succFU$totalEggs == 0, 0,
+                                  mal_succFU$NumDeveloped_Calc/mal_succFU$totalEggs)
+fem_succFU$prop_surviving <- ifelse(fem_succFU$totalEggs == 0, 0,
+                                  fem_succFU$NumDeveloped/fem_succFU$totalEggs)
+
+mal_succSS$prop_surviving <- ifelse(mal_succSS$totalEggs == 0, 0,
+                                  mal_succSS$NumDeveloped/mal_succSS$totalEggs)
+fem_succSS$prop_surviving <- ifelse(fem_succSS$totalEggs == 0, 0,
+                                  fem_succSS$NumDeveloped/fem_succSS$totalEggs)
+```
+
+```{r fig-prop-offspringFL, message=FALSE}
+prop_offspringFL <- ggplot(fem_succFL[fem_succFL$totalEggs != 0,], 
+                             aes(x = MatingSuccess, 
+                                 y = prop_surviving)) +
   geom_point(color = paste0(sex_cols["F"],"75"), 
              size = 3) +
-  geom_point(data = mal_succ[mal_succ$totalEggs != 0,], 
+  geom_point(data = mal_succFL[mal_succFL$totalEggs != 0,], 
              color = paste0(sex_cols["M"],"75"), 
              size = 3,
              aes(x=as.numeric(MatingSuccess)+0.05, y=prop_surviving)) +
@@ -310,7 +607,7 @@ prop_offspring_no0 <- ggplot(fem_succ[fem_succ$totalEggs != 0,],
               aes(color = "Female"), 
               se = FALSE, lty = 2, 
               fullrange=TRUE, show.legend = FALSE) +
-  geom_smooth(data = mal_succ[mal_succ$totalEggs != 0,], 
+  geom_smooth(data = mal_succFL[mal_succFL$totalEggs != 0,], 
               method = "lm", 
               aes(color = "Male"), 
               se = FALSE, lty = 2, 
@@ -323,39 +620,95 @@ prop_offspring_no0 <- ggplot(fem_succ[fem_succ$totalEggs != 0,],
 
 ```
 
-### Fig. 1 Assembly
+```{r fig-prop-offspringFU, message=FALSE}
+prop_offspringFU <- ggplot(fem_succFU[fem_succFU$totalEggs != 0,], 
+                             aes(x = MatingSuccess, 
+                                 y = prop_surviving)) +
+  geom_point(color = paste0(sex_cols["F"],"75"), 
+             size = 3) +
+  geom_point(data = mal_succFU[mal_succFU$totalEggs != 0,], 
+             color = paste0(sex_cols["M"],"75"), 
+             size = 3,
+             aes(x=as.numeric(MatingSuccess)+0.05, y=prop_surviving)) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black"),
+        text=element_text(size=16)) +
+  geom_smooth(method = "lm", 
+              aes(color = "Female"), 
+              se = FALSE, lty = 2, 
+              fullrange=TRUE, show.legend = FALSE) +
+  geom_smooth(data = mal_succFU[mal_succFU$totalEggs != 0,], 
+              method = "lm", 
+              aes(color = "Male"), 
+              se = FALSE, lty = 2, 
+              fullrange = TRUE, show.legend = FALSE) +
+  labs(x="Number of mates", 
+       y="") +
+  scale_color_manual(name='',
+                     breaks=c('Female', 'Male'),
+                     values=c('Female'=sex_cols[["F"]], 'Male'=sex_cols[["M"]]))
 
-```{r fig1, message=FALSE}
-fig1a <- image_ggplot(image_read('figs/female_cropped.png'),interpolate = TRUE)
-fig1a <- fig1a + labs(title="Female")
+```
 
-fig1b <- image_ggplot(image_read('figs/male_cropped.png'),interpolate = TRUE)
-fig1b <- fig1b + labs(title="Male")
+```{r fig-prop-offspringSS, message=FALSE}
+prop_offspringSS <- ggplot(fem_succSS[fem_succSS$totalEggs != 0,], 
+                             aes(x = MatingSuccess, 
+                                 y = prop_surviving)) +
+  geom_point(color = paste0(sex_cols["F"],"75"), 
+             size = 3) +
+  geom_point(data = mal_succSS[mal_succSS$totalEggs != 0,], 
+             color = paste0(sex_cols["M"],"75"), 
+             size = 3,
+             aes(x=as.numeric(MatingSuccess)+0.05, y=prop_surviving)) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black"),
+        text=element_text(size=16)) +
+  geom_smooth(method = "lm", 
+              aes(color = "Female"), 
+              se = FALSE, lty = 2, 
+              fullrange=TRUE, show.legend = FALSE) +
+  geom_smooth(data = mal_succSS[mal_succSS$totalEggs != 0,], 
+              method = "lm", 
+              aes(color = "Male"), 
+              se = FALSE, lty = 2, 
+              fullrange = TRUE, show.legend = FALSE) +
+  labs(x="Number of mates", 
+       y="") +
+  scale_color_manual(name='',
+                     breaks=c('Female', 'Male'),
+                     values=c('Female'=sex_cols[["F"]], 'Male'=sex_cols[["M"]]))
 
-fig1<-wrap_plots(
-  fig1a,
-  fig1b,
-  bateman, 
-  prop_offspring_no0,
-  nrow = 2
-)
-fig1<-fig1 + plot_annotation(tag_levels = 'A') + 
-  plot_layout(guides = 'collect',
-              widths = 1,
-              heights = c(1,2))  &
-  theme(legend.position='bottom',
+```
+
+### Fig. Bateman Assembly
+
+```{r figbateman, message=FALSE}
+
+figbateman <- wrap_plots(batemanFL, batemanFU,
+                         batemanSS, prop_offspringFL,
+                         prop_offspringFU, prop_offspringSS,
+                         nrow = 2)
+
+figbateman <- figbateman + plot_annotation(tag_levels = 'A') + 
+  plot_layout(widths = 1,
+              heights = c(2,2))  &
+  theme(legend.position='top',
         legend.text=element_text(size=16),
         plot.tag = element_text(size = 16))
 
-fig1
+figbateman
 
-ggsave("figs/Fig1.pdf",fig1,height = 6, width=8)
-ggsave("figs/Fig1.png",fig1,height = 6, width=8)
+ggsave("figs/FigBateman.pdf",figbateman, height = 7, width=10)
+ggsave("figs/FigBateman.png",figbateman,height = 7, width=10)
 
 ```
 
 ```{r showAssembledFig1, eval=TRUE}
-knitr::include_graphics("figs/Fig1.png")
+knitr::include_graphics("figs/FigBateman.png")
 ```
 
 
