@@ -371,8 +371,9 @@ boxplot(mal_succ$snout_len ~ mal_succ$preg_status,
 It appears that males who didn't mate are at least slightly larger than the males who did mate, I want to see if there is any significance behind that.
 
 ```{r mat-stat-stat-mal, eval=FALSE}
+mal_succ$depth_adj <- mal_succ$depth/mal_succ$length
 var.test(mal_succ$length ~ mal_succ$preg_status) #equal
-var.test(mal_succ$depth ~ mal_succ$preg_status) #not equal
+var.test(mal_succ$depth_adj ~ mal_succ$preg_status) #equal
 var.test(mal_succ$svl ~ mal_succ$preg_status) #not equal
 var.test(mal_succ$bp_area ~ mal_succ$preg_status) #equal
 var.test(mal_succ$bp_length ~ mal_succ$preg_status) #equal
@@ -381,7 +382,8 @@ var.test(mal_succ$snout_len ~ mal_succ$preg_status)
 
 t.test(mal_succ$length ~ mal_succ$preg_status, 
        var.equal = TRUE)
-t.test(mal_succ$depth ~ mal_succ$preg_status)
+t.test(mal_succ$depth_adj ~ mal_succ$preg_status,
+       var.equal = TRUE)
 t.test(mal_succ$svl ~ mal_succ$preg_status)
 t.test(mal_succ$bp_area ~ mal_succ$preg_status,
        var.equal = TRUE)
@@ -423,18 +425,26 @@ boxplot(fem_succ$snout_len ~ fem_succ$mated,
 The pattern in which females are larger seems to swap for the different metrics and the differences aren't large at all. Let's do some tests to confirm this.
 
 ```{r mat-stat-stat-fem, eval=FALSE}
-var.test(fem_succ$length ~ fem_succ$mated)
-var.test(fem_succ$depth ~ fem_succ$mated)
-var.test(fem_succ$svl ~ fem_succ$mated)
-var.test(fem_succ$weight ~ fem_succ$mated)
-var.test(fem_succ$snout_len ~ fem_succ$mated)
+var.test(fem_succ$length ~ fem_succ$mated) #equal
+var.test(fem_succ$depth_adj ~ fem_succ$mated) #not equal
+var.test(fem_succ$svl ~ fem_succ$mated) #equal
+var.test(fem_succ$weight ~ fem_succ$mated) #equal
+var.test(fem_succ$snout_adj ~ fem_succ$mated) #equal
 
-#All of the variances are equal
-t.test(fem_succ$length ~ fem_succ$mated)
-t.test(fem_succ$depth ~ fem_succ$mated)
-t.test(fem_succ$svl ~ fem_succ$mated)
-t.test(fem_succ$weight ~ fem_succ$mated)
-t.test(fem_succ$snout_len ~ fem_succ$mated)
+normalTest(fem_succ$length, method = "da") #normal
+normalTest(fem_succ$depth_adj, method = "da") #not normal
+normalTest(fem_succ$svl, method = "da") #normal
+normalTest(fem_succ$weight, method = "da") #normal
+normalTest(fem_succ$snout_adj, method = "da") #not normal
+
+t.test(fem_succ$length ~ fem_succ$mated, 
+       var.equal = TRUE)
+wilcox.test(fem_succ$depth_adj ~ fem_succ$mated)
+t.test(fem_succ$svl ~ fem_succ$mated, 
+       var.equal = TRUE)
+t.test(fem_succ$weight ~ fem_succ$mated, 
+       var.equal = TRUE)
+wilcox.test(fem_succ$snout_len ~ fem_succ$mated)
 ```
 
 Unsurprisingly there is no sig. difference in females who mated vs. didn't mate for any of the size metrics, but in each case the females who did mate were just slightlyyyy larger than the ones who didn't.
@@ -871,7 +881,7 @@ for (trial in unique(fem_succ$trial_num)) {
   
   #Column-bind the trial #, Mating success, and calculated rel. fitness
   fitness <- cbind("trial" = rep(trial, nrow(tmp)), 
-                   "MatingSuccess" = tmp$MatingSuccess, 
+                   "MatingSuccess" = rel_mate_succuess, 
                    rel_repo_fitness)
   
   #Add this chunk of data to the dataframe we created
@@ -896,7 +906,7 @@ for (trial in unique(mal_succ$trial_num)) {
   
   #Column-bind the trial #, Mating success, and calculated rel. fitness
   fitness <- cbind("trial" = rep(trial, nrow(tmp)), 
-                   "MatingSuccess" = tmp$MatingSuccess, 
+                   "MatingSuccess" = rel_mate_succuess, 
                    rel_repo_fitness)
   
   #Add this chunk of data to the dataframe we created
