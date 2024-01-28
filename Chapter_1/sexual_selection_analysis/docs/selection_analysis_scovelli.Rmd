@@ -720,3 +720,111 @@ abline(lm(mal_succ$prop_surviving ~
             mal_succ$MatingSuccess),
        col = "#beaed4", lwd = 3, lty = 2)
 ```
+
+# Mate success versus Reproductive success (Bateman Gradient)
+I now want to look at any relationship that may exist between mating success and reproductive success for males and females. The Bateman gradient will be calculated, which is the slope of the weighted least-squares regression of relative reproductive success (number of offspring divided by the mean) on mating success.
+
+```{r bateman, echo=FALSE, fig.cap="Relationship between reproductive success and mating success for male (purple) and female (green) _Syngnathus floridae_. Reproductive success is shown as relative fitness (i.e. number of offspring produced divided by the mean number of offspring produced). Bateman's gradient is shown as the weighted least-squares regression line (dashed) for males and females.", fig.height=5}
+#Calculating relative fitness as a metric for reproductive success
+#Create a dataframe to store all of the calculations of relative fitness in
+fem_bateman <- data.frame(matrix(ncol = 3,
+                                 nrow = 0))
+colnames(fem_bateman) <- c("trial", "MatingSuccess","rel_repo_fitness")
+
+#Loop through each trial to calculate relative fitness
+for (trial in unique(fem_succ$trial_num)) {
+  
+  #Subset the overall dataframe to work with an individual trial
+  tmp <- fem_succ[fem_succ$trial_num == trial, ]
+  
+  #Calculate relative fitness
+  rel_repo_fitness <- tmp$totalEggs/mean(tmp$totalEggs)
+  
+  #Calculte mating fitness
+  rel_mate_succuess <- tmp$MatingSuccess/mean(tmp$MatingSuccess)
+  
+  #Column-bind the trial #, Mating success, and calculated rel. fitness
+  fitness <- cbind("trial" = rep(trial, nrow(tmp)), 
+                   "MatingSuccess" = rel_mate_succuess, 
+                   rel_repo_fitness)
+  
+  #Add this chunk of data to the dataframe we created
+  fem_bateman <- rbind(fem_bateman, fitness)
+}
+
+#Repeat process for the Male mating data
+mal_bateman <- data.frame(matrix(ncol = 3,
+                                 nrow = 0))
+colnames(mal_bateman) <- c("trial", "MatingSuccess","rel_repo_fitness")
+
+for (trial in unique(mal_succ$trial_num)) {
+  
+  #Subset the overall dataframe to work with an individual trial
+  tmp <- mal_succ[mal_succ$trial_num == trial, ]
+  
+  #Calculate relative fitness
+  rel_repo_fitness <- tmp$totalEggs/mean(tmp$totalEggs)
+  
+  #Calculte mating fitness
+  rel_mate_succuess <- tmp$MatingSuccess/mean(tmp$MatingSuccess)
+  
+  #Column-bind the trial #, Mating success, and calculated rel. fitness
+  fitness <- cbind("trial" = rep(trial, nrow(tmp)), 
+                   "MatingSuccess" = rel_mate_succuess, 
+                   rel_repo_fitness)
+  
+  #Add this chunk of data to the dataframe we created
+  mal_bateman <- rbind(mal_bateman, fitness)
+}
+
+
+#Generating Bateman's gradient
+#Define the model
+fem_model <- lm(fem_bateman$rel_repo_fitness ~ fem_bateman$MatingSuccess)
+mal_model <- lm(mal_bateman$rel_repo_fitness ~ mal_bateman$MatingSuccess)
+
+#define weights to use
+wt_fem <- 1 / lm(abs(fem_model$residuals) ~ fem_model$fitted.values)$fitted.values^2
+wt_mal <- 1 / lm(abs(mal_model$residuals) ~ mal_model$fitted.values)$fitted.values^2
+
+#perform weighted least squares regression
+wls_model_fem <- lm(fem_bateman$rel_repo_fitness ~ fem_bateman$MatingSuccess,
+                    weights=wt_fem)
+wls_model_mal <- lm(mal_bateman$rel_repo_fitness ~ mal_bateman$MatingSuccess,
+                    weights=wt_mal)
+
+#Running a weighted least squares regression between MS and Sex
+all_sex_succ <- read.csv("data/all_succ_matings.csv", header = TRUE)
+MS_sex_model <- lm(all_sex_succ$relative_fit ~
+                     all_sex_succ$MatingSuccess*all_sex_succ$sex)
+
+wt_all <- 1 / lm(abs(MS_sex_model$residuals) ~
+                   MS_sex_model$fitted.values)$fitted.values^2
+
+wls_MS_sex_model <- lm(all_sex_succ$relative_fit ~ all_sex_succ$MatingSuccess*all_sex_succ$sex, weights = wt_all)
+  
+#Plotting the relationship between the mating and reproductive success
+par(mfrow=c(1,1))
+plot(fem_bateman$MatingSuccess,
+     fem_bateman$rel_repo_fitness,
+     xlab = "Number of Mates (mating success)",
+     ylab = "Relative Fitness (reproductive success)",
+     pch = 19,
+     col = "#7fc97f75")
+points(mal_bateman$MatingSuccess,
+       mal_bateman$rel_repo_fitness,
+       xlab = "Number of Mates (mating success)",
+       ylab = "Relative Fitness (reproductive success)",
+       pch = 19,
+       col = "#beaed475")
+abline(wls_model_fem, col = "#7fc97f", lwd = 3, lty = 2)
+abline(wls_model_mal, col = "#beaed4", lwd = 3, lty = 2)
+
+write.csv(fem_bateman, file = "data/SS_fem_bateman.csv", row.names = FALSE)
+write.csv(mal_bateman, file = "data/SS_mal_bateman.csv", row.names = FALSE)
+```
+
+```{r sum-bateman}
+summary(wls_model_fem)
+summary(wls_model_mal)
+```
