@@ -464,3 +464,58 @@ cor.test(skin_bias_tau_all$tau, abs(skin_bias_tau_all$log2FoldChange), method = 
 ```
 
 The correlation is stronger for gonads now that all genes are included, but it has gone down for the liver, however both of them are still significant. There is now a significant negative correlation in the brain and skin between sex bias and $\tau$.
+
+I want to look into some of the genes that show a high bias and a high tau to see what is going on.
+
+```{r explore-tau-sb}
+##Looking at genes that have a high bias and tau in the gonads
+#Getting list of genes with the greatest Tau
+top_gonad <- gonad_bias_tau_all[sqrt(abs(gonad_bias_tau_all$log2FoldChange)) > 4 & gonad_bias_tau_all$tau > 0.7, ]
+
+#Looking at the TPMS
+tpms[rownames(tpms)== top_gonad$Row.names[1],] #Testis-specific MB
+tpms[rownames(tpms)== top_gonad$Row.names[2],] #Testis-specific MB
+tpms[rownames(tpms)== top_gonad$Row.names[3],] #Testis-specific MB
+tpms[rownames(tpms)== top_gonad$Row.names[4],] #Testis-specific MB
+tpms[rownames(tpms)== top_gonad$Row.names[5],] #Ovary-Specific FB
+tpms[rownames(tpms)== top_gonad$Row.names[6],] #Ovary-specific FB
+tpms[rownames(tpms)== top_gonad$Row.names[7],] #Testis-specific MB
+tpms[rownames(tpms)== top_gonad$Row.names[8],] #Skin-specific FB
+
+#Liver
+top_liver <- liver_bias_tau_all[sqrt(abs(liver_bias_tau_all$log2FoldChange)) > 3 & liver_bias_tau_all$tau > 0.7, ]
+
+#Looking at the TPMS
+tpms[rownames(tpms)== top_liver$Row.names[1],] #Liver-specific FB
+tpms[rownames(tpms)== top_liver$Row.names[2],] #Liver-specific FB
+tpms[rownames(tpms)== top_liver$Row.names[3],] #Liver-specific FB 
+tpms[rownames(tpms)== top_liver$Row.names[4],] #Liver-specific FB
+tpms[rownames(tpms)== top_liver$Row.names[5],] #Liver-specific FB
+tpms[rownames(tpms)== top_liver$Row.names[6],] #Liver-specific FB 
+tpms[rownames(tpms)== top_liver$Row.names[7],] #Liver-specific FB
+tpms[rownames(tpms)== top_liver$Row.names[8],] #Liver-specific FB
+tpms[rownames(tpms)== top_liver$Row.names[9],] #Liver-specific FB
+tpms[rownames(tpms)== top_liver$Row.names[10],] #Liver-specific FB
+
+#Brain
+top_brain <- brain_bias_tau_all[sqrt(abs(brain_bias_tau_all$log2FoldChange)) > 3 & brain_bias_tau_all$tau > 0.7, ]
+
+#Looking at the TPMS
+tpms[rownames(tpms)== top_brain$Row.names[1],] #Brain-specific FB
+tpms[rownames(tpms)== top_brain$Row.names[2],] #Brain-specific MB
+
+#Skin
+top_skin <- skin_bias_tau_all[sqrt(abs(skin_bias_tau_all$log2FoldChange)) > 3 & skin_bias_tau_all$tau > 0.7, ]
+
+#Looking at the TPMs
+tpms[rownames(tpms)== top_skin$Row.names[1],] #Skin-specific MB
+tpms[rownames(tpms)== top_skin$Row.names[2],] #Skin-specific FB
+tpms[rownames(tpms)== top_skin$Row.names[3],] #Skin-specific FB 
+tpms[rownames(tpms)== top_skin$Row.names[4],] #Skin-specific FB
+tpms[rownames(tpms)== top_skin$Row.names[5],] #Liver-specific FB
+tpms[rownames(tpms)== top_skin$Row.names[6],] #Liver-specific FB 
+tpms[rownames(tpms)== top_skin$Row.names[7],] #Liver-specific FB
+```
+
+For most of the tissues genes that are highly sex-biased in that organ are also tissue-specific in that organ. In the skin we can see a couple cases where a gene is female-biased in the skin but more tissue-specific in the liver.
+
