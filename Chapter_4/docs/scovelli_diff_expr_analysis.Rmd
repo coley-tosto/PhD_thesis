@@ -609,3 +609,104 @@ upset(fromList(listInputall),
 ```
 
 In both males and females the highest number of shared sex-biased genes is found between the gonads and the skin (Fig. \@ref(fig:upset-plot-mal), \@ref(fig:upset-plot-fem)) followed by the gonads and the liver. There are no genes that are shared across the same organ between males and females (i.e. biased in males and females in the liver) which is good (Fig. \@ref(fig:upset-plot-all)). There are no genes that are biased in all four organs, but for females there are 2 genes that are female-biased in the liver, skin, and ovaries, and in males there is 1 gene that is biased in the liver, skin, and testis (Fig. \@ref(fig:upset-plot-mal), \@ref(fig:upset-plot-fem)).
+
+## Looking at variation in logFC across both sex-bias categories and tissue types
+I want to create a plot the highlights the variation we see in fold-change both across the different biases groups (male-biased, female-biased, and non-biased) within one tissue type and across all of the tissue types. To do this I first need to create a "long" dataset.
+
+```{r logFC-long-dataset}
+logFC_long<- data.frame(
+  tissue=c(rep("Brain",nrow(brain_fem_biased)),
+           rep("Brain", nrow(brain_mal_biased)),
+           rep("Brain", nrow(brain_non_biased)),
+           rep("Gonad", nrow(gonad_fem_biased)),
+           rep("Gonad", nrow(gonad_mal_biased)),
+           rep("Gonad", nrow(gonad_non_biased)),
+           rep("Liver", nrow(liver_fem_biased)),
+           rep("Liver", nrow(liver_mal_biased)),
+           rep("Liver", nrow(liver_non_biased)),
+           rep("Skin", nrow(skin_fem_biased)),
+           rep("Skin", nrow(skin_mal_biased)),
+           rep("Skin", nrow(skin_non_biased))
+         ),
+  bias=c(rep("FB",nrow(brain_fem_biased)),
+         rep("MB",nrow(brain_mal_biased)),
+         rep("NB", nrow(brain_non_biased)),
+         rep("FB", nrow(gonad_fem_biased)),
+         rep("MB", nrow(gonad_mal_biased)),
+         rep("NB", nrow(gonad_non_biased)),
+         rep("FB", nrow(liver_fem_biased)),
+         rep("MB", nrow(liver_mal_biased)),
+         rep("NB", nrow(liver_non_biased)),
+         rep("FB", nrow(skin_fem_biased)),
+         rep("MB", nrow(skin_mal_biased)),
+         rep("NB", nrow(skin_non_biased))
+         ),
+  logFC=c(brain_fem_biased$log2FoldChange,
+          brain_mal_biased$log2FoldChange,
+          brain_non_biased$log2FoldChange,
+          gonad_fem_biased$log2FoldChange,
+          gonad_mal_biased$log2FoldChange,
+          gonad_non_biased$log2FoldChange,
+          liver_fem_biased$log2FoldChange,
+          liver_mal_biased$log2FoldChange,
+          liver_non_biased$log2FoldChange,
+          skin_fem_biased$log2FoldChange,
+          skin_mal_biased$log2FoldChange,
+          skin_non_biased$log2FoldChange
+          ),
+  geneID=c(rownames(brain_fem_biased),
+           rownames(brain_mal_biased),
+           rownames(brain_non_biased),
+           rownames(gonad_fem_biased),
+           rownames(gonad_mal_biased),
+           rownames(gonad_non_biased),
+           rownames(liver_fem_biased),
+           rownames(liver_mal_biased),
+           rownames(liver_non_biased),
+           rownames(skin_fem_biased),
+           rownames(skin_mal_biased),
+           rownames(skin_non_biased)
+           )
+  
+)
+
+#Exporting this data, run once and then commented out
+#write.csv(logFC_long, "data/logFC_long_sexbias.csv", row.names = FALSE)
+```
+
+After creating the long version of the dataset I can generate a plot to demonstrate the variation in logFC across bias and tissue type.
+
+```{r FC-var-plot, echo=FALSE, fig.cap="Absolute value of the logFC for genes that are female-biased, male-biased, and unbiased across each tissue type. Raw fold-change values are added ontop of the boxplot as jitters."}
+
+my_colors <- c("FB" = "#7fc97f", "MB" = "#beaed4", "NB" = "darkgray")
+
+ggplot(logFC_long,
+       aes(x = bias, y = abs(logFC), fill = bias)) +
+  geom_boxplot() +
+  scale_fill_manual(values = my_colors) +
+  facet_grid(. ~ tissue) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black")) +
+  geom_point(data=logFC_long, aes(x=bias, y=abs(logFC)),
+             size=0.4, 
+             position = position_jitter(width = 0.15)) + 
+  labs(x="Bias Level", y="|logFC|") +
+  guides(fill = guide_legend(title = "Bias Level", order = 3))
+
+```
+
+There appears to be differences in the logFC across both the organs and the sex-bias groups (male-biased, fem-biased, and non-biased) (Fig. \@ref(fig:FC-var-plot)). In the brain, potentially skin, and especially in the liver, the female-biased genes are more biased (i.e. higher logFC) than the male-biased genes. This reverses in the gonad. In every case the non-biased genes have the lowest median logFC even though there is some variation.
+
+I am going to fit a linear model to the data.
+
+```{r FC-var-stats, warning=FALSE, eval=FALSE}
+#Looking at some summary statistics for logFC between the different groups
+tapply(abs(logFC_long$logFC), list(logFC_long$bias, logFC_long$tissue), median)
+tapply(abs(logFC_long$logFC), list(logFC_long$bias, logFC_long$tissue), sd)
+
+model <- lm(abs(logFC_long$logFC)~ logFC_long$tissue * logFC_long$bias)
+summary(model)
+```
+
