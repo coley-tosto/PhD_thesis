@@ -24,6 +24,9 @@ knitr::opts_knit$set(root.dir='../',fig_path="../imgs/")
 library(DESeq2)
 library(pheatmap)
 library(RColorBrewer)
+library(PCAtools)
+library(ggplot2)
+library(ggpubr)
 ```
 
 ``` {r read-data}
@@ -252,3 +255,286 @@ ggplot(pca_plotting_data, aes(x=PC1, y=PC4, color = Organ, shape = Sex)) +
              linetype = 'dashed')
 ```
 
+# Investigating the Multi-factor analysis
+Because these samples come from a variety of sources and have been sequenced across a variety of institutes at various times and with various parameters, including all of the samples in the DESeq2 analysis (and therefore normalizing across all of the samples) may be influencing outcomes. 
+
+To test this I am going to set up the multi-factor analysis as I normally would and then I am going to perform a single-factor analysis within one organ to see if the outcomes are drastically different.
+
+First, lets run the multi-factor analysis as counts ~ group, where group includes both the organ and sex (i.e. MLiver, Fliver, etc.). I am removing the brood pouch samples from this analysis as I cannot compare across the sexes (only males have a brood pouch).
+
+```{r multi-factor-analysis, message=FALSE, warning=FALSE}
+#Create an additional column the has the two conditions combined(sex and organ type)
+SS_samples$group <- factor(paste0(SS_samples$Sex, SS_samples$Organ))
+
+##Create a copy of the DESeq dataset
+ddsMF_SS <- DESeqDataSetFromTximport(SS_txi.salmon,
+                                     colData = SS_samples,
+                                     design = ~ group)
+
+##Remove the brood pouch samples from the dataset
+ddsMF_SS <- ddsMF_SS[, ddsMF_SS$Organ != "BP"]
+
+ddsMF_SS$group <- as.character(ddsMF_SS$group)
+ddsMF_SS$group <- as.factor(ddsMF_SS$group)
+
+##Filter the dataset, only keeping rows that have at least 10 reads total
+keep <- rowSums(counts(ddsMF_SS)) >= 10 
+ddsMF_SS <- ddsMF_SS[keep, ]
+
+#Run the differential expression analysis
+ddsMF_SS_exp <- DESeq(ddsMF_SS)
+resultsNames(ddsMF_SS_exp)
+
+```
+
+## Look at the results of the MF analysis in the Liver
+There are many criteria that have been employed previously as cut offs for what is sex biased vs what is not. For this study I am classifying sex-biased genes as: **genes with a p-value < 0.05 AND a logFC $\ge |2|$**.
+
+```{r m-f-liver-results}
+##Pulling out the liver M-F results with an alpha of 0.05
+liver_con_res <- results(ddsMF_SS_exp, contrast = c("group", "MLiver", "FLiver"),
+                         alpha = 0.05)
+liver_con_res$trin_geneid <- rownames(liver_con_res)
+head(liver_con_res)
+
+summary(liver_con_res)
+
+#Number of sex-biased genes based on our criteria
+#Male-biased
+sum(liver_con_res$padj <= 0.05 & liver_con_res$log2FoldChange >= 2, 
+    na.rm = TRUE)
+
+#Female-biased
+sum(liver_con_res$padj <= 0.05 & liver_con_res$log2FoldChange <= -2, 
+    na.rm = TRUE)
+```
+
+## Running a single factor analysis comparing M-F expression WITHIN the liver only
+```{r liver-sf-analysis, message=FALSE}
+#Create a subset of the DESeq dataset that only includes the liver samples
+dds_SS_liver <- dds_SS[, dds_SS$Organ == "Liver"]
+
+#Filtering to remove any rows that have less than 10 reads total
+keep <- rowSums(counts(dds_SS_liver)) >= 10
+dds_SS_liver <- dds_SS_liver[keep, ]
+
+design(dds_SS_liver) <- ~ Sex
+
+#Run the differential expression analysis
+dds_SS_liver_exp <- DESeq(dds_SS_liver)
+
+#Compliling the results
+res <- results(dds_SS_liver_exp, alpha = 0.05)
+
+summary(res)
+
+#Number of sex-biased genes based on our criteria
+#Male-biased
+sum(res$padj <= 0.05 & res$log2FoldChange >= 2, 
+    na.rm = TRUE)
+
+#Female-biased
+sum(res$padj <= 0.05 & res$log2FoldChange <= -2, 
+    na.rm = TRUE)
+```
+
+There doesn't appear to be a huge difference between the number of sex-biased genes that are highlighted when the liver is investigated within the multi-factor analysis or when it is investigated as it's own single factor analysis. For a more conservative estimate of sex-bias within each organ I am going to move forward with the single factor analysis within each organ type. 
+
+# Running a single factor analysis between males and females WITHIN each organ
+## Liver M-F differential expression
+The single factor analysis from the liver showed `r sum(res$padj <= 0.05 & res$log2FoldChange >= 2, na.rm = TRUE)` male-biased genes and `r sum(res$padj <= 0.05 & res$log2FoldChange <= -2, na.rm = TRUE)` female-biased genes. I am going to pull out all of the female- and male-biased genes to store them in their own objects as well as genes that are non-biased. Non-biased genes will be categorized as genes with a p-value > 0.05, regardless of what the logFC may be.
+
+```{r liver-sf-sexbiased}
+#Removing the rows where padj. is NA in results
+liver_con_res_noNA <- res[!is.na(res$padj),]
+summary(liver_con_res_noNA) #We can now see that there are no outliers or 
+                            #low counts since the NAs have been removed
+
+#Creating a vector that contains all of the male-biased and female-biased genes in the liver
+liver_mal_biased <- liver_con_res_noNA[which(liver_con_res_noNA$log2FoldChange >= 2
+                                             & liver_con_res_noNA$padj <= 0.05),]
+liver_fem_biased <- liver_con_res_noNA[which(liver_con_res_noNA$log2FoldChange <= -2 
+                                             & liver_con_res_noNA$padj <= 0.05),]
+
+#Creating an object that contains all of the non-biased genes in the liver
+liver_non_biased <- liver_con_res_noNA[which(liver_con_res_noNA$padj > 0.05),]
+```
+
+## Brain M-F differential expression
+
+```{r brain-sf-analysis, message=FALSE}
+#Create a subset of the DESeq dataset that only includes the liver samples
+dds_SS_brain <- dds_SS[, dds_SS$Organ == "Brain"]
+
+#Filtering to remove any rows that have less than 10 reads total
+keep <- rowSums(counts(dds_SS_brain)) >= 10
+dds_SS_brain <- dds_SS_brain[keep, ]
+
+design(dds_SS_brain) <- ~ Sex
+
+#Run the differential expression analysis
+dds_SS_brain_exp <- DESeq(dds_SS_brain)
+
+#Compiling the results
+res_brain <- results(dds_SS_brain_exp, alpha = 0.05)
+
+summary(res_brain)
+```
+
+In the brain there are `r sum(res_brain$padj <= 0.05 & res_brain$log2FoldChange >= 2, na.rm = TRUE)` male-biased genes and `r sum(res_brain$padj <= 0.05 & res_brain$log2FoldChange <= -2, na.rm = TRUE)` female-biased genes. Let's now save those and the non biased genes into their own objects.
+
+```{r brain-sf-sexbiased}
+#Removing the rows where padj. is NA in results
+brain_res_noNA <- res_brain[!is.na(res_brain$padj),]
+summary(brain_res_noNA) #We can now see that there are no outliers or 
+                            #low counts since the NAs have been removed
+
+#Creating a vector that contains all of the male-biased and female-biased genes in the brain
+brain_mal_biased <- brain_res_noNA[which(brain_res_noNA$log2FoldChange >= 2
+                                             & brain_res_noNA$padj <= 0.05),]
+brain_fem_biased <- brain_res_noNA[which(brain_res_noNA$log2FoldChange <= -2 
+                                             & brain_res_noNA$padj <= 0.05),]
+
+#Creating an object that contains all of the non-biased genes in the brain
+brain_non_biased <- brain_res_noNA[which(brain_res_noNA$padj > 0.05),]
+```
+
+## Skin M-F differential expression
+
+```{r skin-sf-analysis, message=FALSE}
+#Create a subset of the DESeq dataset that only includes the liver samples
+dds_SS_skin <- dds_SS[, dds_SS$Organ == "Skin"]
+
+#Filtering to remove any rows that have less than 10 reads total
+keep <- rowSums(counts(dds_SS_skin)) >= 10
+dds_SS_skin <- dds_SS_skin[keep, ]
+
+design(dds_SS_skin) <- ~ Sex
+
+#Run the differential expression analysis
+dds_SS_skin_exp <- DESeq(dds_SS_skin)
+
+#Compiling the results
+res_skin <- results(dds_SS_skin_exp, alpha = 0.05)
+
+summary(res_skin)
+```
+
+In the skin there are `r sum(res_skin$padj <= 0.05 & res_skin$log2FoldChange >= 2, na.rm = TRUE)` male-biased genes and `r sum(res_skin$padj <= 0.05 & res_skin$log2FoldChange <= -2, na.rm = TRUE)` female-biased genes. Let's now save those and the non biased genes into their own objects.
+
+```{r gonad-sf-sexbiased}
+#Removing the rows where padj. is NA in results
+skin_res_noNA <- res_skin[!is.na(res_skin$padj),]
+summary(skin_res_noNA) #We can now see that there are no outliers or 
+                       #low counts since the NAs have been removed
+
+#Creating a vector that contains all of the male-biased and female-biased genes in the skin
+skin_mal_biased <- skin_res_noNA[which(skin_res_noNA$log2FoldChange >= 2
+                                        & skin_res_noNA$padj <= 0.05),]
+skin_fem_biased <- skin_res_noNA[which(skin_res_noNA$log2FoldChange <= -2 
+                                        & skin_res_noNA$padj <= 0.05),]
+
+#Creating an object that contains all of the non-biased genes in the skin
+skin_non_biased <- skin_res_noNA[which(skin_res_noNA$padj > 0.05),]
+```
+
+## Gonad M-F differential expression
+```{r gonad-sf-analysis, message=FALSE}
+#Create a subset of the DESeq dataset that only includes the liver samples
+dds_SS_gonad <- dds_SS[, dds_SS$Organ == "Gonad"]
+
+#Filtering to remove any rows that have less than 10 reads total
+keep <- rowSums(counts(dds_SS_gonad)) >= 10
+dds_SS_gonad <- dds_SS_gonad[keep, ]
+
+design(dds_SS_gonad) <- ~ Sex
+
+#Run the differential expression analysis
+dds_SS_gonad_exp <- DESeq(dds_SS_gonad)
+
+#Compiling the results
+res_gonad <- results(dds_SS_gonad_exp, alpha = 0.05)
+
+summary(res_gonad)
+```
+
+Between the testis and ovaries there are `r sum(res_gonad$padj <= 0.05 & res_gonad$log2FoldChange >= 2, na.rm = TRUE)` male-biased genes and `r sum(res_gonad$padj <= 0.05 & res_gonad$log2FoldChange <= -2, na.rm = TRUE)` female-biased genes. Let's now save those and the non biased genes into their own objects.
+
+```{r gonad-sex-biased}
+#Removing the rows where padj. is NA in results
+gonad_con_res_noNA <- res_gonad[!is.na(res_gonad$padj), ]
+summary(gonad_con_res_noNA) #We can now see that there are no outliers or 
+                            #low counts since the NAs have been removed
+
+#Creating an object that contains all of the male-biased and female-biased genes in the gonads
+gonad_mal_biased <- gonad_con_res_noNA[which(gonad_con_res_noNA$log2FoldChange >= 2 
+                                             & gonad_con_res_noNA$padj <= 0.05),]
+gonad_fem_biased <- gonad_con_res_noNA[which(gonad_con_res_noNA$log2FoldChange <= -2 
+                                             & gonad_con_res_noNA$padj <= 0.05),]
+
+#Creating an object that contains all of the non-biased genes in the gonads, p>0.05
+gonad_non_biased <- gonad_con_res_noNA[which(gonad_con_res_noNA$padj > 0.05),]
+```
+
+### Looking at the MA-plots for each organ
+```{r MA-plot-MF, echo=FALSE, fig.height= 15, fig.width=8, fig.cap="MA-plots generated for each organ type that compares logFC to the mean expression. Female-biased and Male-biased genes are represented by color (green and purple correspondingly) and are determing with a fc cutoff of 2 and a p-value cutoff of 0.05."}
+liver_MA <- ggmaplot(res,
+         fdr = 0.05, fc = 2,
+         size = 1.4,
+         top = 0,
+         main = expression("Male Liver" %->% "Female Liver"),
+         font.label = c("bold", 11), label.rectangle = TRUE,
+         palette = c("#beaed4", "#7fc97f", "gray27"),
+         select.top.method = c("padj", "fc"),
+         ggtheme = ggplot2::theme_minimal()
+         )
+
+brain_MA <- ggmaplot(res_brain,
+         fdr = 0.05, fc = 2,
+         size = 1.4,
+         top = 0,
+         main = expression("Male Brain" %->% "Female Brain"),
+         font.label = c("bold", 11), label.rectangle = TRUE,
+         palette = c("#beaed4", "#7fc97f", "gray27"),
+         select.top.method = c("padj", "fc"),
+         ggtheme = ggplot2::theme_minimal()
+         )
+
+skin_MA <- ggmaplot(res_skin,
+         fdr = 0.05, fc = 2,
+         size = 1.4,
+         top = 0,
+         main = expression("Male Skin" %->% "Female Skin"),
+         font.label = c("bold", 11), label.rectangle = TRUE,
+         palette = c("#beaed4", "#7fc97f", "gray27"),
+         select.top.method = c("padj", "fc"),
+         ggtheme = ggplot2::theme_minimal()
+         )
+
+gonad_MA <- ggmaplot(res_gonad,
+         fdr = 0.05, fc = 2,
+         size = 1.4,
+         top = 0,
+         main = expression("Testis" %->% "Ovaries"),
+         font.label = c("bold", 11), label.rectangle = TRUE,
+         palette = c("#beaed4", "#7fc97f", "gray27"),
+         select.top.method = c("padj", "fc"),
+         ggtheme = ggplot2::theme_minimal()
+         )
+
+#Merge all the plots into one
+detach("package:PCAtools", unload = TRUE)
+library(cowplot)
+plot_grid(liver_MA, brain_MA, 
+          skin_MA, gonad_MA,
+          ncol = 1,
+          nrow = 4,
+          labels = c('A', 'B', 'C', 'D'),
+          label_fontfamily = 'sans',
+          label_fontface = 'bold',
+          label_size = 18,
+          rel_heights = c(4.10, 4.10, 4.10, 4.10))
+
+```
+
+From the MA plots we can see the highest number of biased genes are found in the gonads (Fig. \@ref(fig:MA-plot-MF)) and then the liver, skin, and lastly the brain The liver appears to be the only organ where there are more female-biased genes than male-biased genes.
