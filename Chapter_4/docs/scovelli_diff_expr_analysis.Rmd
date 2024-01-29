@@ -27,6 +27,8 @@ library(RColorBrewer)
 library(PCAtools)
 library(ggplot2)
 library(ggpubr)
+#library(cowplot)
+library(UpSetR)
 ```
 
 ``` {r read-data}
@@ -538,3 +540,72 @@ plot_grid(liver_MA, brain_MA,
 ```
 
 From the MA plots we can see the highest number of biased genes are found in the gonads (Fig. \@ref(fig:MA-plot-MF)) and then the liver, skin, and lastly the brain The liver appears to be the only organ where there are more female-biased genes than male-biased genes.
+
+## Looking at shared sex-biased genes with Upset plots
+I now want to see if there are genes that are female/male-biased in multiple organs or if there are genes that are female-biased in one organ and then male-biased in a different organ, etc.. In order to do this I will be creating upset plots first for the sexes individually and then across all biased genes.
+
+```{r upset-plot-mal, echo=FALSE, fig.cap="Upset plots to show the number of shared sex-biased genes across the organs in males."}
+#Male-biased genes
+listInputMB <- list("Testis" = rownames(gonad_mal_biased),
+                  "Male Brain"=rownames(brain_mal_biased), 
+                  "Male Liver"=rownames(liver_mal_biased),
+                  "Male Skin"=rownames(skin_mal_biased)
+                  )
+upset(fromList(listInputMB),
+      mainbar.y.label = "Number of Shared Male-Biased Genes",
+      sets.x.label = "Total Number of Male-Biased Genes",
+      point.size = 3)
+```
+
+```{r upset-plot-fem, echo=FALSE, fig.cap="Upset plots to show the number of shared sex-biased genes across the organs in females."}
+#Female
+listInputFB <- list("Ovaries" = rownames(gonad_fem_biased),
+                  "Female Brain"=rownames(brain_fem_biased), 
+                  "Female Liver"=rownames(liver_fem_biased),
+                  "Female Skin"=rownames(skin_fem_biased)
+                  )
+upset(fromList(listInputFB),
+      mainbar.y.label = "Number of Shared Female-Biased Genes",
+      sets.x.label = "Total Number of Female-Biased Genes",
+      point.size = 3)
+```
+
+```{r upset-plot-all, echo=FALSE, fig.cap="Upset plots to show the number of shared sex-biased genes across the organs across both sexes."}
+#Esporting data used to make the Upset plot (run once and them commented out)
+#write.table(as.data.frame(gonad_mal_biased), "data/gonad_mal_biased.txt", 
+ #           row.names = TRUE)
+#write.table(as.data.frame(gonad_fem_biased), "data/gonad_fem_biased.txt", 
+ #           row.names = TRUE)
+#write.table(as.data.frame(brain_mal_biased), "data/brain_mal_biased.txt", 
+ #           row.names = TRUE)
+#write.table(as.data.frame(brain_fem_biased), "data/brain_fem_biased.txt", 
+ #           row.names = TRUE)
+#write.table(as.data.frame(liver_mal_biased), "data/liver_mal_biased.txt", 
+ #           row.names = TRUE)
+#write.table(as.data.frame(liver_fem_biased), "data/liver_fem_biased.txt", 
+ #           row.names = TRUE)
+#write.table(as.data.frame(skin_mal_biased), "data/skin_mal_biased.txt", 
+ #           row.names = TRUE)
+#write.table(as.data.frame(skin_fem_biased), "data/skin_fem_biased.txt", 
+ #           row.names = TRUE)
+
+#Checking there is no overlap between the two sexes
+listInputall <- list("Testis" = rownames(gonad_mal_biased),
+                  "Male Brain"=rownames(brain_mal_biased), 
+                  "Male Liver"=rownames(liver_mal_biased),
+                  "Male Skin"=rownames(skin_mal_biased),
+                  "Ovaries" = rownames(gonad_fem_biased),
+                  "Female Brain"=rownames(brain_fem_biased),
+                  "Female Skin"=rownames(skin_fem_biased),
+                  "Female Liver"=rownames(liver_fem_biased))
+
+upset(fromList(listInputall),
+      mainbar.y.label = "Number of Shared Sex-Biased Genes",
+      sets.x.label = "Total Number of Sex-Biased Genes",
+      point.size = 3,
+      nsets = 6,
+      nintersects = NA)
+
+```
+
+In both males and females the highest number of shared sex-biased genes is found between the gonads and the skin (Fig. \@ref(fig:upset-plot-mal), \@ref(fig:upset-plot-fem)) followed by the gonads and the liver. There are no genes that are shared across the same organ between males and females (i.e. biased in males and females in the liver) which is good (Fig. \@ref(fig:upset-plot-all)). There are no genes that are biased in all four organs, but for females there are 2 genes that are female-biased in the liver, skin, and ovaries, and in males there is 1 gene that is biased in the liver, skin, and testis (Fig. \@ref(fig:upset-plot-mal), \@ref(fig:upset-plot-fem)).
