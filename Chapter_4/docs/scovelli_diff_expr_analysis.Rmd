@@ -815,7 +815,7 @@ for (dataset in DE_models) {
 
 ### Investigating the results of the sex-specific subsetting
 Let's now take a look at how many sex-specific genes we have in each tissue type:
-```{r sex-specific-counts, echo=FALSE, message=FALSE, warning=FALSE}
+```{r sex-specific-counts, echo=FALSE, message=FALSE, warning=FALSE, eval =FALSE}
 sex_specific_counts <- data.frame(tissue = rep(c("Brain", "Gonad", "Liver", "Skin"), 2),
                                   sex = c(rep("M", 4),
                                           rep("F", 4)),
