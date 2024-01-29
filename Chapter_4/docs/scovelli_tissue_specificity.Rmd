@@ -302,3 +302,84 @@ plotCounts(dds_SS, gene= names(bot_tau[9]), intgroup="Organ")
 
 We can see that for the genes that have high tau values the plots of the normalized counts show higher expression in just that tissue, whereas for the plots of the lower tau values no clear patterns are showing up in the plots of the counts. This is what we want to see, increasing confidence that the the calculations of tau are accurate.
 
+# Sex Bias and Tissue Specificity
+Now that I have calculated $\tau$ I want to relate it back to information about sex bias to see what, if any, relationship exists. I am going to do this separately for the different organs to see if the relationship changes based on organ type.
+
+## $\tau$ and logFC in sex-biased genes for each organ
+A gene was determined to be sex-biased if it had a log-fold change $\ge |2|$ AND an adjusted p-value of $< 0.05$. Earlier I read in four datasets that contain information for all of the significantly expressed genes in each organ (i.e. the genes that were nnot given a p-value of NA from DESeq). 
+
+From these datasets I can pull out the female- and male-biased genes to plot logFC against $\tau$ within the genes that are sex-biased.
+
+```{r tau-v-bias, echo=FALSE, fig.cap="Sex bias (in terms of the square root of the absolute value of the log2FoldChange) versus tissue specificity (tau) for all genes that are sex biased in the gonads, liver, skin, and brain."}
+
+#Pull out the sex-biased genes (based on FC of >= |2| and padj of < 0.05) for each organ
+liver_biased <- liver_res[which(abs(liver_res$log2FoldChange) >= 2 & liver_res$padj <= 0.05),]
+gonad_biased <- gonad_res[which(abs(gonad_res$log2FoldChange) >= 2 & gonad_res$padj <= 0.05),]
+brain_biased <- brain_res[which(abs(brain_res$log2FoldChange) >= 2 & brain_res$padj <= 0.05),]
+skin_biased <- skin_res[which(abs(skin_res$log2FoldChange) >= 2 & skin_res$padj <= 0.05),]
+
+#Merge the sex bias information with the tau values based on row names for each organ
+liver_bias_tau <- merge(as.data.frame(liver_biased), as.data.frame(tau), by = "row.names")
+gonad_bias_tau <- merge(as.data.frame(gonad_biased), as.data.frame(tau), by = "row.names")
+brain_bias_tau <- merge(as.data.frame(brain_biased), as.data.frame(tau), by = "row.names")
+skin_bias_tau <- merge(as.data.frame(skin_biased), as.data.frame(tau), by = "row.names")
+
+#Plot the relationship between FC (bias) and tau for each organ
+par(mar=c(5.1, 4.1, 4.1, 8.1), xpd=FALSE)
+plot(sqrt(abs(gonad_bias_tau$log2FoldChange)),
+     gonad_bias_tau$tau,
+     pch=19,
+     col = "#EEB42275",
+     xlab="Sex bias (|log2 fold change|)",
+     ylab=expression(tau["TPM"]))
+points(sqrt(abs(liver_bias_tau$log2FoldChange)),
+     liver_bias_tau$tau,
+     pch=19,
+     col="#EE826275")
+points(sqrt(abs(brain_bias_tau$log2FoldChange)),
+     brain_bias_tau$tau,
+     pch=19,
+     col = "#6E8B3D75")
+points(sqrt(abs(skin_bias_tau$log2FoldChange)),
+     skin_bias_tau$tau,
+     pch=19,
+     col = "#6959CD75")
+
+#Add the best fit lines
+abline(lm(gonad_bias_tau$tau ~ sqrt(abs(gonad_bias_tau$log2FoldChange))), col="#EEB422", lwd = 3)
+abline(lm(liver_bias_tau$tau ~ sqrt(abs(liver_bias_tau$log2FoldChange))), col = "#EE8262", lwd = 3, lty = 2)
+abline(lm(brain_bias_tau$tau ~ sqrt(abs(brain_bias_tau$log2FoldChange))), col = "#6E8B3D", lwd = 3, lty = 3)
+abline(lm(skin_bias_tau$tau ~ sqrt(abs(skin_bias_tau$log2FoldChange))), col = "#6959CD", lwd = 3, lty = 4)
+
+#Add a legend
+par(xpd=TRUE)
+legend("bottomright", inset = c(0.2, 0),
+       legend = c("Gonads","Liver",
+                    "Brain", "Skin"), 
+       lty=c(1,2,3,4), 
+       col=c("#EEB422","#EE8262","#6E8B3D", "#6959CD"), 
+       bty='o',
+       lwd=3)
+legend("bottomright", inset = c(0.025, 0),
+       c("","","", ""), 
+       pch=c(21,21,21, 21),
+       pt.bg = c("#EEB42275","#EE826275","#6E8B3D75", "#6959CD75"),
+       pt.lwd = 1,
+       pt.cex = 1.5,
+       col=c("#EEB422","#EE8262","#6E8B3D", "#6959CD"), bty='n',
+       text.width = 1.1,
+       cex=1.0
+       )
+
+```
+
+The absolute value of the log2 fold change was square root transformed. There appears to be a relationship between $\tau$ and sex bias for the gonads and the liver (Fig. \@ref(fig:tau-v-bias)), but potentially not for the brain and the skin. In the brain this may be due to a low number of sex-biased genes. We can look further into this relationship with a Spearman's rank correlation test. This was done between $\tau$ and the $|log2FoldChange|$ for each organ separately.
+
+```{r tau-v-bias-cor, echo=FALSE, message=FALSE, warning=FALSE}
+cor.test(gonad_bias_tau$tau, abs(gonad_bias_tau$log2FoldChange), method = "spearman")
+cor.test(liver_bias_tau$tau, abs(liver_bias_tau$log2FoldChange), method = "spearman")
+cor.test(brain_bias_tau$tau, abs(brain_bias_tau$log2FoldChange), method = "spearman")
+cor.test(skin_bias_tau$tau, abs(skin_bias_tau$log2FoldChange), method = "spearman")
+```
+
+Unsurprisingly only the liver and gonads show a significant correlation between sex bias and tissue specificity, with the highest rho showing up for the liver. I want to do this same analysis but with all significantly expressed genes (i.e. biased and unbiased genes) to see if this relationship changes at all.
