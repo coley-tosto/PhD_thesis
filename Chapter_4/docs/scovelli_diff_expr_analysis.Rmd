@@ -354,6 +354,7 @@ The single factor analysis from the liver showed `r sum(res$padj <= 0.05 & res$l
 liver_con_res_noNA <- res[!is.na(res$padj),]
 summary(liver_con_res_noNA) #We can now see that there are no outliers or 
                             #low counts since the NAs have been removed
+#write.csv(as.data.frame(liver_con_res_noNA), "data/liver_res.csv", row.names = TRUE)
 
 #Creating a vector that contains all of the male-biased and female-biased genes in the liver
 liver_mal_biased <- liver_con_res_noNA[which(liver_con_res_noNA$log2FoldChange >= 2
@@ -393,6 +394,7 @@ In the brain there are `r sum(res_brain$padj <= 0.05 & res_brain$log2FoldChange 
 brain_res_noNA <- res_brain[!is.na(res_brain$padj),]
 summary(brain_res_noNA) #We can now see that there are no outliers or 
                             #low counts since the NAs have been removed
+#write.csv(as.data.frame(brain_res_noNA), "data/brain_res.csv", row.names = TRUE)
 
 #Creating a vector that contains all of the male-biased and female-biased genes in the brain
 brain_mal_biased <- brain_res_noNA[which(brain_res_noNA$log2FoldChange >= 2
@@ -432,6 +434,7 @@ In the skin there are `r sum(res_skin$padj <= 0.05 & res_skin$log2FoldChange >= 
 skin_res_noNA <- res_skin[!is.na(res_skin$padj),]
 summary(skin_res_noNA) #We can now see that there are no outliers or 
                        #low counts since the NAs have been removed
+#write.csv(as.data.frame(skin_res_noNA), "data/skin_res.csv", row.names = TRUE)
 
 #Creating a vector that contains all of the male-biased and female-biased genes in the skin
 skin_mal_biased <- skin_res_noNA[which(skin_res_noNA$log2FoldChange >= 2
@@ -470,6 +473,7 @@ Between the testis and ovaries there are `r sum(res_gonad$padj <= 0.05 & res_gon
 gonad_con_res_noNA <- res_gonad[!is.na(res_gonad$padj), ]
 summary(gonad_con_res_noNA) #We can now see that there are no outliers or 
                             #low counts since the NAs have been removed
+#write.csv(as.data.frame(gonad_con_res_noNA), "data/gonad_res.csv", row.names = TRUE)
 
 #Creating an object that contains all of the male-biased and female-biased genes in the gonads
 gonad_mal_biased <- gonad_con_res_noNA[which(gonad_con_res_noNA$log2FoldChange >= 2 
