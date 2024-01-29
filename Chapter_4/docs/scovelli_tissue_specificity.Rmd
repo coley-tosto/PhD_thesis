@@ -53,3 +53,187 @@ colData <- as.data.frame(samples)
 rownames(colData) <- samples$ID
 
 ```
+
+# Differential Expression Analysis
+The main goal of this analysis is to relate measure of pleiotropic constraints (tissue specificity) to sex bias. In order to do that I need to combine my sex-bias data that I generated in a separate .Rmd with the tau values I will be generating in this document.
+
+Here I am reading in the sex-bias datasets that correspond to each of the organ's single-factor analysis. These datasets include all of the genes where the p-value was not equal to "NA".
+
+```{r read-in-sb-datasets}
+liver_res <- read.csv("data/liver_res.csv", 
+                      row.names = 1, 
+                      header = TRUE)
+brain_res <- read.csv("data/brain_res.csv", 
+                      row.names = 1, 
+                      header = TRUE)
+gonad_res <- read.csv("data/gonad_res.csv", 
+                      row.names = 1, 
+                      header = TRUE)
+skin_res <- read.csv("data/skin_res.csv", 
+                      row.names = 1, 
+                      header = TRUE)
+```
+
+# Calculating Tissue Specificity
+To estimate tissue specificity, the TPM estimates are needed which is the number of transcripts from a particular gene normalized first by gene length, and then by sequencing depth (in millions) in the sample. The output quant.sf files from salmon have the following format:
+
+```
+Name | Length | EffectiveLength | TPM | NumReads
+
+```
+
+## Pulling out TPM values
+From the salmon outputs I pulled out the TPM values for each sample.
+
+```{r getTPMs}
+#Get the list of file names/paths for all of the quant.sf files
+files <- list.files(pattern = ".sf", path = "data/scovelli_expression_files", 
+                    full.names = TRUE)
+
+#For each quant.sf file pull out the TPM column
+tpms <- do.call(cbind, lapply(files, function(file){
+
+  dat <- read.delim(file, row.names = "Name")
+  tpm <- dat["TPM"]
+  colnames(tpm) <- gsub("data/scovelli_expression_files/(.*)_quant.sf","\\1",file)
+  
+  return(tpm)
+}))
+
+colnames(tpms) <- samples$ID
+
+#Remove brood pouch samples from the dataset
+tpms <- tpms[, !(colnames(tpms) %in% samples$ID[samples$Organ == "BP"])]
+```
+
+## Filtering the TPM dataset
+I know want to filter the TPM dataset to remove a few things. These include similar things that I filtered out of the DESeq2 datasets prior to performing the differential expression analysis. This includes:
+
+  1. Keeping only the rows that weren't filtered out in the DESeq2 dataset due to low counts (rowSum $\le$ 10).
+  
+  2. Removing the rows that corresponded to genes that were "outliers" in the DESeq2 analysis.
+
+This will be imperfect filtering in this case because I did an individual single-factor analysis within each organ type. To try and make life easier I am going to run the multi-factor analysis on the DESeq dataset and then apply the filtering from that onto the TPM dataset. 
+
+It should also be noted that the DESeq2 filtering was done based off of the count data and not the TPMs, but as TPMs are just normalized counts they should be correlated and something that was had low gene counts should also have a low TPM and anything that was considered an outlier in the counts could also be an outlier in terms of TPM, but it may not be perfect.
+
+```{r filterTPMs}
+#Running the MF diff. expr. analysis
+#Create the DESeq dataset
+dds_SS <- DESeqDataSetFromTximport(txi.salmon, 
+                                   colData = samples,
+                                   design = ~ group)
+##Remove brood pouches from the dataset
+dds_SS <- dds_SS[, dds_SS$Organ != "BP"]
+
+dds_SS$group <- as.character(dds_SS$group)
+dds_SS$group <- as.factor(dds_SS$group)
+
+##Filter the dataset, only keeping rows that have at least 10 reads total
+keep <- rowSums(counts(dds_SS)) >= 10 
+dds_SS <- dds_SS[keep, ]
+
+#Generate the expression values
+dds_SS_exp <- DESeq(dds_SS)
+
+#Filtering the tpm dataset
+#Only keeping the rows that weren't filtered out due to low counts
+tpms <- tpms[rownames(tpms) %in% rownames(dds_SS), ]
+
+#Pulling out the geneIDs for genes that were categorized as "outliers" by DESeq2
+#Calculating the Cooks threshold that would have been used
+np <- length(resultsNames(dds_SS_exp))
+nsamp <- ncol(dds_SS_exp)
+cooks_thresh <- qf(0.99, df1 = np, df2 = nsamp-np)
+
+out_ids <- names(mcols(dds_SS_exp)$maxCooks[mcols(dds_SS_exp)$maxCooks > cooks_thresh])
+
+#Removing the rows in the tpm dataset that were deemed "outliers" by DESeq2
+tpms <- tpms[!(rownames(tpms) %in% out_ids), ]
+
+```
+
+## Generating $\tau$
+These filtered TPM estimates can then be used to estimate $\tau$, a tissue specificity estimator that can range from 0 to 1. $\tau$ is calculated for each tissue, $i$, as follows:
+
+$$
+\tau=\frac{\sum_i{[1-ln(TPM_i)/ln(TPM_{max})]}}{N-1}
+$$
+
+where $TPM_{max}$ is the maximum **average** TPM for a given tissue type, and $TPM_i$ is the **average** TPM for tissue $i$. If $\tau = 0$, that gene is evenly expressed across tissues; if $\tau=1$, the gene is expressed in an entirely tissue-specific fashion. Because TPM values approach 0 are impacted by sampling stochasticity, any genes that had an expression approaching 0 were set to $TPM=2$. 
+
+```{r est_tauFXN}
+#Function for estimating tau given the TPM matrix and metadata file
+est_tau<-function(geneDat,colDat){
+  
+  #For each row in the TPM matrix cbind it with the metadata file,
+  #this attaches organ type information to the TPM values
+  tissue_dat<-data.frame(cbind(colDat,
+                               geneDat))
+  
+  #For the TPM values approaching 0, set them to 2
+  tissue_dat$geneDat[tissue_dat$geneDat < 1] <- 2
+  
+  
+  #Get the average TPM for each tissue type (TPMi)
+  tissue_avgs<-tapply(tissue_dat$geneDat,tissue_dat$Organ,mean)
+  
+  #Get the maximum value from the average TPMS (TPMmax)
+  tpmMax <- max(tissue_avgs, na.rm=TRUE)
+    
+  #IF running tau on JUST males of JUST females, this accounts for the
+  #fact that ovary or testis will return an NA in the averaging
+  if(length(unique(tissue_dat$Organ)) == 4){
+    tau <- sum(1-(log(tissue_avgs[unique(tissue_dat$Organ)])/log(tpmMax)))/
+      (length(unique(tissue_dat$Organ))-1)
+    
+    return(tau)
+  }
+  
+  #IF using the WHOLE dataset, calculate tau
+  tau<-sum(1-(log(tissue_avgs)/log(tpmMax)))/(length(unique(tissue_dat$Organ))-1)
+  
+  return(tau)
+}
+
+```
+
+I then applied that function across each row in the TPMs matrix with my metadata stored in the object `colData`. The metadata file includes the sample ID, Sex, and Organ type for every column present in the TPM matrix.
+
+I ran the $\tau$ function with the whole dataset, and then for just males and just females.
+
+```{r calcTau}
+colData <- colData[colData$Organ != "BP",]
+colData$Organ <- as.factor(as.character(colData$Organ))
+
+tau <- apply(tpms, 1, est_tau, colDat=colData)
+
+
+tau_fem<-apply(tpms[,which(colData$Sex=="F")], 1, est_tau,
+               colData[which(colData$Sex=="F"),])
+
+tau_mal<-apply(tpms[,which(colData$Sex=="M")], 1, est_tau,
+               colData[which(colData$Sex=="M"),])
+
+```
+
+```{r tauHist,fig.cap="Distribution of tissue specificity estimates for only the male samples (left) versus only the female samples (middle) versus the male samples and the female samples (right).", echo=FALSE}
+par(mfrow=c(1,3))
+hist(tau_mal,
+     col="grey",
+     xlab=expression(tau),
+     ylab="Number of genes",
+     main="Male-only")
+
+hist(tau_fem,
+     col="grey",
+     xlab=expression(tau),
+     ylab="Number of genes",
+     main="Female-only")
+
+hist(tau,
+     col="grey",
+     xlab=expression(tau),
+     ylab="Number of genes",
+     main="All samples")
+```
