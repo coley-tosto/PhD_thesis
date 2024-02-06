@@ -611,7 +611,7 @@ upset(fromList(listInputall),
       mainbar.y.label = "Number of Shared Sex-Biased Genes",
       sets.x.label = "Total Number of Sex-Biased Genes",
       point.size = 3,
-      nsets = 6,
+      nsets = 8,
       nintersects = NA)
 
 ```
@@ -842,50 +842,50 @@ sex_specific_counts %>%
 ```
 
 ### Pulling out the gene IDs for all of the sex-specific genes
-```{r SS-gene_IDs}
+```{r SS-gene_IDs, eval=FALSE}
 #Run once to create the file and then commented out
-#write.table(cbind(rownames(SS_sex_specific_genes$Brain_male_specific)),
- #           'data/SS_malB_specific_TRgenes.txt', 
- #           sep = "", 
- #           quote=FALSE, 
- #           row.names = FALSE, 
- #           col.names = FALSE)
-#write.table(cbind(rownames(SS_sex_specific_genes$Brain_female_specific)),
- #           'data/SS_femB_specific_TRgenes.txt', 
- #           sep = "", 
- #           quote=FALSE, 
- #           row.names = FALSE, 
- #           col.names = FALSE)
-#write.table(cbind(rownames(SS_sex_specific_genes$Gonad_male_specific)),
- #           'data/SS_malGon_specific_TRgenes.txt', 
- #           sep = "", 
- #           quote=FALSE, 
- #           row.names = FALSE, 
- #           col.names = FALSE)
-#write.table(cbind(rownames(SS_sex_specific_genes$Gonad_female_specific)),
- #           'data/SS_femGon_specific_TRgenes.txt', 
- #           sep = "", 
- #           quote=FALSE, 
- #           row.names = FALSE, 
- #           col.names = FALSE)
-#write.table(cbind(rownames(SS_sex_specific_genes$Liver_male_specific)),
- #           'data/SS_malL_specific_TRgenes.txt', 
- #           sep = "", 
- #           quote=FALSE, 
- #           row.names = FALSE, 
- #           col.names = FALSE)
-#write.table(cbind(rownames(SS_sex_specific_genes$Skin_male_specific)),
- #           'data/SS_malS_specific_TRgenes.txt', 
- #           sep = "", 
- #           quote=FALSE, 
- #           row.names = FALSE, 
- #           col.names = FALSE)
-#write.table(cbind(rownames(SS_sex_specific_genes$Skin_female_specific)),
- #           'data/SS_femS_specific_TRgenes.txt', 
- #           sep = "", 
- #           quote=FALSE, 
- #           row.names = FALSE, 
- #           col.names = FALSE)
+write.table(cbind(rownames(SS_sex_specific_genes$Brain_male_specific)),
+            'data/SS_malB_specific_TRgenes.txt', 
+            sep = "", 
+            quote=FALSE, 
+            row.names = FALSE, 
+            col.names = FALSE)
+write.table(cbind(rownames(SS_sex_specific_genes$Brain_female_specific)),
+            'data/SS_femB_specific_TRgenes.txt', 
+            sep = "", 
+            quote=FALSE, 
+            row.names = FALSE, 
+            col.names = FALSE)
+write.table(cbind(rownames(SS_sex_specific_genes$Gonad_male_specific)),
+            'data/SS_malGon_specific_TRgenes.txt', 
+            sep = "", 
+            quote=FALSE, 
+            row.names = FALSE, 
+            col.names = FALSE)
+write.table(cbind(rownames(SS_sex_specific_genes$Gonad_female_specific)),
+            'data/SS_femGon_specific_TRgenes.txt', 
+            sep = "", 
+            quote=FALSE, 
+            row.names = FALSE, 
+            col.names = FALSE)
+write.table(cbind(rownames(SS_sex_specific_genes$Liver_female_specific)),
+            'data/SS_femL_specific_TRgenes.txt', 
+            sep = "", 
+            quote=FALSE, 
+            row.names = FALSE, 
+            col.names = FALSE)
+write.table(cbind(rownames(SS_sex_specific_genes$Skin_male_specific)),
+            'data/SS_malS_specific_TRgenes.txt', 
+            sep = "", 
+            quote=FALSE, 
+            row.names = FALSE, 
+            col.names = FALSE)
+write.table(cbind(rownames(SS_sex_specific_genes$Skin_female_specific)),
+            'data/SS_femS_specific_TRgenes.txt', 
+            sep = "", 
+            quote=FALSE, 
+            row.names = FALSE, 
+            col.names = FALSE)
 
 ```
 
@@ -987,25 +987,25 @@ bias_cat_skin <- bias_cat_table[,, "Skin"]
 par(mfrow=c(1, 4))
 barplot(bias_cat_brain[,biased_bins[biased_bins!="Unbiased"]], 
         beside = TRUE, 
-        ylim = c(0, max(bias_cat_brain) + 1), 
+        ylim = c(0, max(bias_cat_brain) + 10), 
         col = c("#7fc97f", "#beaed4"),
         main = "Brain")
 
 barplot(bias_cat_gonad[,biased_bins[biased_bins!="Unbiased"]], 
         beside = TRUE, 
-        ylim = c(0, max(bias_cat_gonad) + 1), 
+        ylim = c(0, max(bias_cat_gonad) + 10), 
         col = c("#7fc97f", "#beaed4"),
         main = "Gonad")
 
 barplot(bias_cat_liver[,biased_bins[biased_bins!="Unbiased"]], 
         beside = TRUE, 
-        ylim = c(0, max(bias_cat_liver) + 1), 
+        ylim = c(0, max(bias_cat_liver) + 10), 
         col = c("#7fc97f", "#beaed4"),
         main = "Liver")
 
 barplot(bias_cat_skin[,biased_bins[biased_bins!="Unbiased"]], 
         beside = TRUE, 
-        ylim = c(0, max(bias_cat_skin) + 1), 
+        ylim = c(0, max(bias_cat_skin) + 10), 
         col = c("#7fc97f", "#beaed4"),
         main = "Skin")
 legend("topright", legend = c("Female-biased", "Male-biased"), fill = c("#7fc97f", "#beaed4"))
