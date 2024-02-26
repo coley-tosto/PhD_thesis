@@ -8,3 +8,7 @@
 
 # ignoring all of the .txt files
 *.txt
+
+# ignoring all of the .pdf files and RDS datasets generated from tximport (too large to track)
+*.pdf
+*.RDS
