@@ -5,3 +5,6 @@
 
 # ignoring all of the RHistory files
 *.Rhistory
+
+# ignoring all of the .txt files
+*.txt
