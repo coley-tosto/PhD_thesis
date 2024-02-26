@@ -104,6 +104,9 @@ colnames(tpms) <- samples$ID
 
 #Remove brood pouch samples from the dataset
 tpms <- tpms[, !(colnames(tpms) %in% samples$ID[samples$Organ == "BP"])]
+
+#Remove the sample that was removed in the diff. expression analysis
+tpms <- tpms[, colnames(tpms) != "SSPTM3"]
 ```
 
 ## Filtering the TPM dataset
@@ -112,6 +115,8 @@ I know want to filter the TPM dataset to remove a few things. These include simi
   1. Keeping only the rows that weren't filtered out in the DESeq2 dataset due to low counts (rowSum $\le$ 10).
   
   2. Removing the rows that corresponded to genes that were "outliers" in the DESeq2 analysis.
+  
+  3. Removing the testis sample that was removed in the differential expression analysis and the brood pouch samples (see above).
 
 This will be imperfect filtering in this case because I did an individual single-factor analysis within each organ type. To try and make life easier I am going to run the multi-factor analysis on the DESeq dataset and then apply the filtering from that onto the TPM dataset. 
 
@@ -125,6 +130,9 @@ dds_SS <- DESeqDataSetFromTximport(txi.salmon,
                                    design = ~ group)
 ##Remove brood pouches from the dataset
 dds_SS <- dds_SS[, dds_SS$Organ != "BP"]
+
+##Remove the testis sample
+dds_SS <- dds_SS[, dds_SS$ID != "SSPTM3"]
 
 dds_SS$group <- as.character(dds_SS$group)
 dds_SS$group <- as.factor(dds_SS$group)
@@ -204,6 +212,7 @@ I ran the $\tau$ function with the whole dataset, and then for just males and ju
 
 ```{r calcTau}
 colData <- colData[colData$Organ != "BP",]
+colData <- colData[colData$ID != "SSPTM3",]
 colData$Organ <- as.factor(as.character(colData$Organ))
 
 tau <- apply(tpms, 1, est_tau, colDat=colData)
@@ -255,7 +264,7 @@ tpms[rownames(tpms)== names(top_tau[4]),] #Skin-specific
 tpms[rownames(tpms)== names(top_tau[5]),] #Skin-specific
 tpms[rownames(tpms)== names(top_tau[6]),] #Skin-specific
 tpms[rownames(tpms)== names(top_tau[7]),] #Skin-specific
-tpms[rownames(tpms)== names(top_tau[8]),] #Skin-specific
+tpms[rownames(tpms)== names(top_tau[8]),] #Brain-specific
 tpms[rownames(tpms)== names(top_tau[9]),] #Skin-specific
 
 #Plotting the gene counts from DESeq2 for the toptau genes
@@ -306,7 +315,7 @@ We can see that for the genes that have high tau values the plots of the normali
 Now that I have calculated $\tau$ I want to relate it back to information about sex bias to see what, if any, relationship exists. I am going to do this separately for the different organs to see if the relationship changes based on organ type.
 
 ## $\tau$ and logFC in sex-biased genes for each organ
-A gene was determined to be sex-biased if it had a log-fold change $\ge |2|$ AND an adjusted p-value of $< 0.05$. Earlier I read in four datasets that contain information for all of the significantly expressed genes in each organ (i.e. the genes that were nnot given a p-value of NA from DESeq). 
+A gene was determined to be sex-biased if it had a log-fold change $\ge |2|$ AND an adjusted p-value of $< 0.05$. Earlier I read in four datasets that contain information for all of the significantly expressed genes in each organ (i.e. the genes that were not given a p-value of NA from DESeq). 
 
 From these datasets I can pull out the female- and male-biased genes to plot logFC against $\tau$ within the genes that are sex-biased.
 
@@ -571,6 +580,9 @@ logFC_long$bias_cat <- ifelse(abs(logFC_long$logFC) >= 2 & abs(logFC_long$logFC)
 #Making sure the ordering stays correct
 logFC_long$bias_cat <- factor(logFC_long$bias_cat,
     levels = biased_bins, ordered = TRUE)
+
+#write.csv(logFC_long, "data/logFC_long_taubiasSB.csv", row.names = FALSE)
+
 ```
 
 ```{r tau-v-biascat-plot, echo=FALSE, fig.width=15, fig.height=8, fig.cap="Tissue specifcity (tau) across the different bias levels. Color denotes female-biased versus male biased and jitters were added to show all of the raw tau values."}
@@ -673,7 +685,6 @@ logFC_long_all$bias_cat <- ifelse(logFC_long_all$bias == "UB",
 logFC_long_all$bias_cat <- factor(logFC_long_all$bias_cat,
     levels = biased_bins, ordered = TRUE)
 
-#write.csv(logFC_long_all, "data/logFC_long_taubias.csv", row.names = FALSE)
 ```
 
 
@@ -682,24 +693,34 @@ logFC_long_all$bias_cat <- factor(logFC_long_all$bias_cat,
 my_colors <- c("Gonad" = "#EEB42275", "Liver" = "#EE826275", "Brain" = "#6E8B3D75", "Skin" = "#6959CD75")
 organs <- c(unique(logFC_long_all$tissue))
 
+dds_SS_exp$Organ <- ifelse(dds_SS_exp$Organ %in% c("Ovaries", "Testis"),
+                           paste0("Gonad"), 
+                           paste0(dds_SS_exp$Organ))
+bias_colors <- c("FB" = "#7fc97f", "MB" = "#beaed4", "UB" = "darkgray") 
+
 par(mfrow=c(2,2))
+par(mfrow=c(2, 2), mar=c(3.5, 3.5, 2, 2), mgp = c(1.5,0.5,0))
 for (organ in organs) {
-  
+  #browser()
   tmp <- as.data.frame(counts(dds_SS_exp, normalized = TRUE)[, dds_SS_exp$Organ == organ])
-  #tmp_M <- assay(dds_FL_filtered)[, dds_FL_filtered$Sex == "M" & dds_FL_filtered$Organ == organ]
-  #tmp_F <- assay(dds_FL_filtered)[, dds_FL_filtered$Sex == "F" & dds_FL_filtered$Organ == organ]
   
   tmp$Fmedian <- apply(tmp[, grep("F\\d", colnames(tmp))], 1, median)
   tmp$Mmedian <- apply(tmp[, grep("M", colnames(tmp))], 1, median)
   
-  plot(tmp$Fmedian, tmp$Mmedian,
-       ylab = "Male Expression",
-       xlab = "Female Expression",
+  tmp <- tmp[rownames(tmp) %in% logFC_long_all[logFC_long_all$tissue == organ, ]$geneID, ]
+  
+  tmp <- merge(tmp, logFC_long_all[logFC_long_all$tissue == organ, ],
+               by.x = 0, 
+               by.y = "geneID", 
+               all = TRUE)
+  
+  plot(log(tmp$Fmedian), log(tmp$Mmedian),
+       ylab = expression('log'[2] * '(Male Expression)'),
+       xlab = expression('log'[2] * '(Female Expression)'),
        main = organ,
-       col = my_colors[organ],
+       col = bias_colors[tmp$bias],
        pch = 19,
-       ylim = c(0, 2000),
-       xlim = c(0, 2000))
+       cex=0.25)
   
 }
 
@@ -746,7 +767,8 @@ for(i in 1:length(SS_sex_specific_genes)){
   for(j in 1:nrow(tmp)){
     
     one_gene <- tmp[j, ]
-    
+    if (one_gene %in% names(tau)){
+      
     if(one_gene %in%
        logFC_long_all[logFC_long_all$tissue == organs[[i]] &
                       logFC_long_all$bias == bias[[i]],"gene_ID"]){
@@ -772,6 +794,7 @@ for(i in 1:length(SS_sex_specific_genes)){
       
       rownames(logFC_long_all) <- NULL
     }
+    }  
   }
 }
 
