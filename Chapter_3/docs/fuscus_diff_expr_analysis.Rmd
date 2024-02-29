@@ -800,6 +800,285 @@ gill_fem_biased <- gill_res_noNA[which(gill_res_noNA$log2FoldChange <= -2
 gill_non_biased <- gill_res_noNA[which(gill_res_noNA$padj > 0.05),]
 ```
 
+## Re-looking at variation in logFC across both sex-bias categories and tissue types
+I want to now re-create the plot the highlights the variation we see in fold-change both across the different biases groups (male-biased, female-biased, and non-biased) within one tissue type and across all of the tissue types to see if the weird patterns are still there. To do this I first need to re-generate the "long" style dataset with the new information:
+
+```{r logFC-long-dataset-SFanalysis}
+logFC_long <- data.frame(
+  tissue=c(rep("Gill",nrow(gill_fem_biased)),
+           rep("Gill", nrow(gill_mal_biased)),
+           rep("Gill", nrow(gill_non_biased)),
+           rep("Gonad", nrow(gonad_fem_biased)),
+           rep("Gonad", nrow(gonad_mal_biased)),
+           rep("Gonad", nrow(gonad_non_biased)),
+           rep("Liver", nrow(liver_fem_biased)),
+           rep("Liver", nrow(liver_mal_biased)),
+           rep("Liver", nrow(liver_non_biased))
+         ),
+  bias=c(rep("FB",nrow(gill_fem_biased)),
+         rep("MB",nrow(gill_mal_biased)),
+         rep("NB", nrow(gill_non_biased)),
+         rep("FB", nrow(gonad_fem_biased)),
+         rep("MB", nrow(gonad_mal_biased)),
+         rep("NB", nrow(gonad_non_biased)),
+         rep("FB", nrow(liver_fem_biased)),
+         rep("MB", nrow(liver_mal_biased)),
+         rep("NB", nrow(liver_non_biased))
+         ),
+  logFC=c(gill_fem_biased$log2FoldChange,
+          gill_mal_biased$log2FoldChange,
+          gill_non_biased$log2FoldChange,
+          gonad_fem_biased$log2FoldChange,
+          gonad_mal_biased$log2FoldChange,
+          gonad_non_biased$log2FoldChange,
+          liver_fem_biased$log2FoldChange,
+          liver_mal_biased$log2FoldChange,
+          liver_non_biased$log2FoldChange
+          ),
+  geneID=c(rownames(gill_fem_biased),
+           rownames(gill_mal_biased),
+           rownames(gill_non_biased),
+           rownames(gonad_fem_biased),
+           rownames(gonad_mal_biased),
+           rownames(gonad_non_biased),
+           rownames(liver_fem_biased),
+           rownames(liver_mal_biased),
+           rownames(liver_non_biased)
+           )
+  
+)
+
+#Exporting this data, run once and then commented out
+#write.csv(logFC_long, "data/logFC_long_sexbias.csv", row.names = FALSE)
+```
+
+After re-creating the long version of the dataset I can re-generate the plot.
+
+```{r FC-var-plot-SFanalysis, echo=FALSE, fig.cap="Absolute value of the logFC for genes that are female-biased, male-biased, and unbiased across each tissue type. Raw fold-change values are added ontop of the boxplot as jitters."}
+
+ymax <- max(abs(logFC_long$logFC),
+            na.rm = TRUE) + 5
+organs <- levels(as.factor(logFC_long$tissue))
+
+par(mfrow=c(1,3), 
+    oma=c(4,5,2,8), 
+    mar=c(1,1,1,0))
+
+for(organ in organs){
+   
+   # add jittered points
+   plot(abs(logFC_long$logFC[logFC_long$tissue==organ]) ~ 
+            jitter(as.numeric(as.factor(logFC_long$bias[logFC_long$tissue==organ]))),
+        col="#00000075", 
+        axes=FALSE,
+        cex.main=2,
+        xlim=c(0,4),
+        ylim=c(0,ymax)
+        )
+   
+   # make the boxplot
+   boxplot(abs(logFC_long$logFC[logFC_long$tissue==organ]) ~  
+             logFC_long$bias[logFC_long$tissue==organ],
+           col=scales::alpha(sex_bias_colors,0.75),
+           add = TRUE,
+           yaxt='n',
+           las=1,
+           cex.axis=1.75,
+           frame=FALSE,
+           lwd=1.5,
+           outline=FALSE# do not plot outliers
+           )
+   
+   # make the axis lines longer and thicker
+   axis(1, labels=NA,
+        at=-1:4,
+        lwd=2, 
+        lwd.ticks=0, 
+        las = 3, 
+        cex.axis = 1.5)
+   axis(2, labels=seq(-5,ymax,10),
+        line=NA, 
+        at=seq(-5,ymax,10), 
+        lwd=2,
+        ylim=c(0,ymax),
+        cex.axis=2,
+        las=2)
+   
+   mtext(organ, cex=1.5,outer=FALSE, line=-1)
+   
+ }
+
+```
+
+The weird pattern does appear to still be there for the male-biased genes in the liver. I am going to look more in detail to the expression level of the male- and female-biased genes within each organ across all of the tissues using heatmaps.
+
+## Investigating expression across samples in the sex-biased genes
+For each organ type I am going to pull out either all of the sex-biased genes, or just the top 200 if there are more than that, and look at the expression levels of those genes across all of the samples.
+
+```{r heatmap_gonads, echo=FALSE}
+
+#Set the colors used for the heatmap labeling
+sex_cols <- c("F" = "#7fc97f", "M" = "#beaed4" )
+ann_colors = list(
+  Sex=sex_cols)
+
+#Transform the data
+vsd_gonad <- vst(dds_FU_gonad_exp, blind=FALSE)
+
+#Set the information for how you want the columns to show up
+df_gonad <- as.data.frame(colData(dds_FU_gonad_exp))
+col_order_gonad <- c(
+  rownames(df_gonad[df_gonad$Sex=="F",]),
+  rownames(df_gonad[df_gonad$Sex=="M",])
+)
+
+#Pull out the top 200 male-biased genes
+select_mal_gonad <- rownames(head(gonad_mal_biased[order(gonad_mal_biased$log2FoldChange,
+                                                         decreasing = TRUE),], 
+                                  n=200))
+
+
+gonadM_HM <- pheatmap(assay(vsd_gonad)[select_mal_gonad, col_order_gonad], 
+              cluster_rows = FALSE, 
+              show_rownames = FALSE, 
+              cluster_cols = FALSE, 
+              show_colnames = FALSE,
+              annotation_col = df_gonad[2],
+              annotation_colors=ann_colors,
+              fontsize = 15,
+              annotation_legend = FALSE,
+              main = "Top 200 Male-biased genes in the Testis")
+
+#Pull out the top 200 female-biased genes
+select_fem_gonad <- rownames(head(gonad_fem_biased[order(gonad_fem_biased$log2FoldChange,
+                                                         decreasing = FALSE),], 
+                                  n=200))
+
+gonadF_HM <- pheatmap(assay(vsd_gonad)[select_fem_gonad, col_order_gonad], 
+              cluster_rows = FALSE, 
+              show_rownames = FALSE, 
+              cluster_cols = FALSE, 
+              show_colnames = FALSE,
+              annotation_col = df_gonad[2],
+              annotation_colors=ann_colors,
+              fontsize = 15,
+              annotation_legend = FALSE,
+              main = "Top 200 Female-biased genes in the Ovaries")
+
+```
+
+
+```{r heatmap_liver, echo=FALSE}
+
+#Transform the data
+vsd_liver <- vst(dds_FU_liver_exp, blind=FALSE)
+
+#Set the information for how you want the columns to show up
+df_liver <- as.data.frame(colData(dds_FU_liver_exp))
+col_order_liver <- c(
+  rownames(df_liver[df_liver$Sex=="F",]),
+  rownames(df_liver[df_liver$Sex=="M",])
+)
+
+#Pull out the male-biased genes
+select_mal_liver <- rownames(head(liver_mal_biased[order(liver_mal_biased$log2FoldChange,
+                                                         decreasing = TRUE),], 
+                                  n=200))
+
+
+liverM_HM <- pheatmap(assay(vsd_liver)[select_mal_liver, col_order_liver], 
+              cluster_rows = FALSE, 
+              show_rownames = FALSE, 
+              cluster_cols = FALSE, 
+              show_colnames = FALSE,
+              border_color=NA,
+              annotation_col = df_liver[2],
+              annotation_colors=ann_colors,
+              fontsize = 15,
+              annotation_legend = FALSE,
+              main = "Male-biased genes in the Liver")
+
+#Pull out the female-biased genes
+select_fem_liver <- rownames(head(liver_fem_biased[order(liver_fem_biased$log2FoldChange,
+                                                         decreasing = FALSE),], 
+                                  n=200))
+
+liverF_HM <- pheatmap(assay(vsd_liver)[select_fem_liver, col_order_liver], 
+              cluster_rows = FALSE, 
+              show_rownames = FALSE, 
+              cluster_cols = FALSE, 
+              show_colnames = FALSE,
+              annotation_col = df_liver[2],
+              annotation_colors=ann_colors,
+              border_color=NA,
+              fontsize = 15,
+              annotation_legend = FALSE,
+              main = "Female-biased genes in the Liver")
+
+```
+
+```{r heatmap_gill, echo=FALSE}
+#Transform the data
+vsd_gill <- vst(dds_FU_gill_exp, blind=FALSE)
+
+#Set the information for how you want the columns to show up
+df_gill <- as.data.frame(colData(dds_FU_gill_exp))
+col_order_gill <- c(
+  rownames(df_gill[df_gill$Sex=="F",]),
+  rownames(df_gill[df_gill$Sex=="M",])
+)
+
+#Pull out the male-biased genes
+select_mal_gill <- rownames(head(gill_mal_biased[order(gill_mal_biased$log2FoldChange,
+                                                         decreasing = TRUE),], 
+                                  n=200))
+
+
+gillM_HM <- pheatmap(assay(vsd_gill)[select_mal_gill, col_order_gill], 
+              cluster_rows = FALSE, 
+              show_rownames = FALSE, 
+              cluster_cols = FALSE, 
+              show_colnames = FALSE,
+              border_color=NA,
+              annotation_col = df_gill[2],
+              annotation_colors=ann_colors,
+              fontsize = 15,
+              annotation_legend = FALSE,
+              main = "Male-biased genes in the gill")
+
+#Pull out the female-biased genes
+select_fem_gill <- rownames(head(gill_fem_biased[order(gill_fem_biased$log2FoldChange,
+                                                         decreasing = FALSE),], 
+                                  n=200))
+
+gillF_HM <- pheatmap(assay(vsd_gill)[select_fem_gill, col_order_gill], 
+              cluster_rows = FALSE, 
+              show_rownames = FALSE, 
+              cluster_cols = FALSE, 
+              show_colnames = FALSE,
+              annotation_col = df_gill[2],
+              annotation_colors=ann_colors,
+              border_color=NA,
+              fontsize = 15,
+              annotation_legend = FALSE,
+              main = "Female-biased genes in the gill")
+```
+
+
+There appears to be differences in the logFC across both the organs and the sex-bias groups (male-biased, fem-biased, and non-biased) (Fig. \@ref(fig:FC-var-plot)). In the brain, potentially skin, and especially in the liver, the female-biased genes are more biased (i.e. higher logFC) than the male-biased genes. This reverses in the gonad. In every case the non-biased genes have the lowest median logFC even though there is some variation.
+
+I am going to fit a linear model to the data.
+
+```{r FC-var-stats, warning=FALSE, eval=FALSE}
+#Looking at some summary statistics for logFC between the different groups
+tapply(abs(logFC_long$logFC), list(logFC_long$bias, logFC_long$tissue), median)
+tapply(abs(logFC_long$logFC), list(logFC_long$bias, logFC_long$tissue), sd)
+
+model <- lm(abs(logFC_long$logFC)~ logFC_long$tissue * logFC_long$bias)
+summary(model)
+```
+
+
 ## Creating an Upset Plot
 
 ```{r upset-plot-mal, echo=FALSE, fig.cap="Upset plots to show the number of shared sex-biased genes across the organs in males."}
