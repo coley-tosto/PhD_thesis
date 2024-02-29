@@ -625,7 +625,7 @@ sex_bias_colors <- c("FB" = "#7fc97f",
                      "UB" = "darkgray")
 organs <- levels(as.factor(FU_logFC_long$tissue))
 
-par(mfrow=c(1,4), 
+par(mfrow=c(1,3), 
     oma=c(4,5,2,8), 
     mar=c(1,1,1,0))
 
@@ -675,6 +675,130 @@ for(organ in organs){
 ```
 
 There are some weird patterns popping up in this analysis. The first one is the magnitude of differences in male- and female-biased genes in the liver. This weirdness is then confirmed in the above plot (Fig. \@ref(fig:FC-var-plot)), we can see this clumping pattern showing um in the male-biased genes in the liver. There is a cluster of genes with a logFC between 5 -15 and then another clump at 25 and above, and very little in between. This may be a result of normalizing across all of the organs. I am going to try re-running the DE analysis within each organ and see if that helps anything.
+
+# Running a single factor analysis between males and females WITHIN each organ
+## Liver M-F differential expression
+
+```{r liver-sf-analysis, message=FALSE}
+#Create a subset of the DESeq dataset that only includes the liver samples
+dds_FU_liver <- ddsMF_FU[, ddsMF_FU$Organ == "Liver"]
+
+#Filtering to remove any rows that have less than 10 reads total
+keep <- rowSums(counts(dds_FU_liver)) >= 10
+dds_FU_liver <- dds_FU_liver[keep, ]
+
+design(dds_FU_liver) <- ~ Sex
+
+#Run the differential expression analysis
+dds_FU_liver_exp <- DESeq(dds_FU_liver)
+
+#Compiling the results
+res_liver <- results(dds_FU_liver_exp, alpha = 0.05)
+
+summary(res_liver)
+
+```
+
+The single factor analysis from the liver showed `r sum(res_liver$padj <= 0.05 & res_liver$log2FoldChange >= 2, na.rm = TRUE)` male-biased genes and `r sum(res_liver$padj <= 0.05 & res_liver$log2FoldChange <= -2, na.rm = TRUE)` female-biased genes. I am going to pull out all of the female- and male-biased genes to store them in their own objects as well as genes that are non-biased. Non-biased genes will be categorized as genes with a p-value > 0.05, regardless of what the logFC may be.
+
+```{r liver-sf-sexbiased}
+#Removing the rows where padj. is NA in results
+liver_res_noNA <- res_liver[!is.na(res_liver$padj),]
+summary(liver_res_noNA) #We can now see that there are no outliers or 
+                            #low counts since the NAs have been removed
+#write.csv(as.data.frame(liver_res_noNA), "data/liver_res.csv", row.names = TRUE)
+
+#Creating a vector that contains all of the male-biased and female-biased genes in the brain
+liver_mal_biased <- liver_res_noNA[which(liver_res_noNA$log2FoldChange >= 2
+                                             & liver_res_noNA$padj <= 0.05),]
+liver_fem_biased <- liver_res_noNA[which(liver_res_noNA$log2FoldChange <= -2 
+                                             & liver_res_noNA$padj <= 0.05),]
+
+#Creating an object that contains all of the non-biased genes in the brain
+liver_non_biased <- liver_res_noNA[which(liver_res_noNA$padj > 0.05),]
+```
+
+## Gonad M-F differential expression
+
+```{r gonad-sf-analysis, message=FALSE}
+#Create a subset of the DESeq dataset that only includes the gonad samples
+dds_FU_gonad <- ddsMF_FU[, ddsMF_FU$Organ == "Gonad"]
+
+#Filtering to remove any rows that have less than 10 reads total
+keep <- rowSums(counts(dds_FU_gonad)) >= 10
+dds_FU_gonad <- dds_FU_gonad[keep, ]
+
+design(dds_FU_gonad) <- ~ Sex
+
+#Run the differential expression analysis
+dds_FU_gonad_exp <- DESeq(dds_FU_gonad)
+
+#Compiling the results
+res_gonad <- results(dds_FU_gonad_exp, alpha = 0.05)
+
+summary(res_gonad)
+
+```
+
+The single factor analysis from the gonad showed `r sum(res_gonad$padj <= 0.05 & res_gonad$log2FoldChange >= 2, na.rm = TRUE)` male-biased genes and `r sum(res_gonad$padj <= 0.05 & res_gonad$log2FoldChange <= -2, na.rm = TRUE)` female-biased genes. I am going to pull out all of the female- and male-biased genes to store them in their own objects as well as genes that are non-biased. Non-biased genes will be categorized as genes with a p-value > 0.05, regardless of what the logFC may be.
+
+```{r gonad-sf-sexbiased}
+#Removing the rows where padj. is NA in results
+gonad_res_noNA <- res_gonad[!is.na(res_gonad$padj),]
+summary(gonad_res_noNA) #We can now see that there are no outliers or 
+                            #low counts since the NAs have been removed
+#write.csv(as.data.frame(gonad_res_noNA), "data/gonad_res.csv", row.names = TRUE)
+
+#Creating a vector that contains all of the male-biased and female-biased genes in the brain
+gonad_mal_biased <- gonad_res_noNA[which(gonad_res_noNA$log2FoldChange >= 2
+                                             & gonad_res_noNA$padj <= 0.05),]
+gonad_fem_biased <- gonad_res_noNA[which(gonad_res_noNA$log2FoldChange <= -2 
+                                             & gonad_res_noNA$padj <= 0.05),]
+
+#Creating an object that contains all of the non-biased genes in the brain
+gonad_non_biased <- gonad_res_noNA[which(gonad_res_noNA$padj > 0.05),]
+```
+
+## Gill M-F differential expression
+
+```{r gill-sf-analysis, message=FALSE}
+#Create a subset of the DESeq dataset that only includes the gill samples
+dds_FU_gill <- ddsMF_FU[, ddsMF_FU$Organ == "Gill"]
+
+#Filtering to remove any rows that have less than 10 reads total
+keep <- rowSums(counts(dds_FU_gill)) >= 10
+dds_FU_gill <- dds_FU_gill[keep, ]
+
+design(dds_FU_gill) <- ~ Sex
+
+#Run the differential expression analysis
+dds_FU_gill_exp <- DESeq(dds_FU_gill)
+
+#Compiling the results
+res_gill <- results(dds_FU_gill_exp, alpha = 0.05)
+
+summary(res_gill)
+
+```
+
+The single factor analysis from the gill showed `r sum(res_gill$padj <= 0.05 & res_gill$log2FoldChange >= 2, na.rm = TRUE)` male-biased genes and `r sum(res_gill$padj <= 0.05 & res_gill$log2FoldChange <= -2, na.rm = TRUE)` female-biased genes. I am going to pull out all of the female- and male-biased genes to store them in their own objects as well as genes that are non-biased. Non-biased genes will be categorized as genes with a p-value > 0.05, regardless of what the logFC may be.
+
+```{r gill-sf-sexbiased}
+#Removing the rows where padj. is NA in results
+gill_res_noNA <- res_gill[!is.na(res_gill$padj),]
+summary(gill_res_noNA) #We can now see that there are no outliers or 
+                            #low counts since the NAs have been removed
+#write.csv(as.data.frame(gill_res_noNA), "data/gill_res.csv", row.names = TRUE)
+
+#Creating a vector that contains all of the male-biased and female-biased genes in the brain
+gill_mal_biased <- gill_res_noNA[which(gill_res_noNA$log2FoldChange >= 2
+                                             & gill_res_noNA$padj <= 0.05),]
+gill_fem_biased <- gill_res_noNA[which(gill_res_noNA$log2FoldChange <= -2 
+                                             & gill_res_noNA$padj <= 0.05),]
+
+#Creating an object that contains all of the non-biased genes in the brain
+gill_non_biased <- gill_res_noNA[which(gill_res_noNA$padj > 0.05),]
+```
 
 ## Creating an Upset Plot
 
