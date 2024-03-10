@@ -160,7 +160,7 @@ logFC_TD <- logFC_TD[!(is.na(logFC_TD$Tajima)),]
 #See how many data points we have for each bias category
 tapply(logFC_TD$Tajima[logFC_TD$tissue == "Gonad"], 
        logFC_TD$bias[logFC_TD$tissue == "Gonad"], 
-       length)
+       mean)
 tapply(logFC_TD$Tajima[logFC_TD$tissue == "Liver"], 
        logFC_TD$bias[logFC_TD$tissue == "Liver"], 
        length)
@@ -184,7 +184,7 @@ boxplot(logFC_TD$Tajima[logFC_TD$tissue == "Skin"] ~ logFC_TD$bias[logFC_TD$tiss
         main = "Skin")
 
 
-pairwise.wilcox.test(logFC_TD[logFC_TD$tissue == "Skin", ]$Tajima, logFC_TD[logFC_TD$tissue == "Skin", ]$bias, p.adjust.method = "holm")
+pairwise.wilcox.test(logFC_TD[logFC_TD$tissue == "Gonad", ]$Tajima, logFC_TD[logFC_TD$tissue == "Gonad", ]$bias, p.adjust.method = "holm")
 
 ```
 
@@ -222,7 +222,7 @@ gam_model <- gam(Tajima ~ s(logFC, bs = "cr"),
 
 ```{r}
 # Set the range of polynomial degrees to consider
-degrees <- 1:5
+degrees <- 1:4
 
 # Create an empty vector to store adjusted p-values
 comp_values <- data.frame(matrix(ncol = 3,
