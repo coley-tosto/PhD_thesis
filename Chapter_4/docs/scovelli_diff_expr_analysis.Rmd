@@ -1317,6 +1317,9 @@ for(i in 1:length(SS_sex_specific_genes)){
   }
  }
 
+#Exporting this data, run once and then commented out
+#write.csv(logFC_long, "data/logFC_long_bias_cats.csv", row.names = FALSE)
+
 #Create  subset of our long dataset that does not include the non-biased genes
 logFC_long_noNB <- logFC_long[logFC_long$bias_cat != "Unbiased",]
 
