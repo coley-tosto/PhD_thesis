@@ -1,5 +1,5 @@
 ---
-title: 'Syngnathus floridae: figures'
+title: 'Syngnathus scovelli: Figures'
 output:
   pdf_document: default
   html_document:
@@ -817,7 +817,7 @@ ggsave("figs/FigTAU.png",figTAU, height = 6, width=11)
 knitr::include_graphics("figs/FigTAU.png")
 ```
 
-## Figure Gene Ontology 
+## Figure Gene Ontology - All Organs
 
 ```{r figGOdata}
 all_go_sums_SBG <- read.csv("plot_data/GO_freq_SBG.csv")
@@ -910,24 +910,38 @@ ggsave("figs/FigGO.png", figGO, height=6, width=8)
 
 ```
 
-## Fig. S1 - Top 50 genes heatmap
+## Figure Gene Ontology - Just the Gonads
 
-```{r figS1}
-#Pull out the top 20 rows with the most expression
-select <- order(rowMeans(norm_counts),
-                decreasing = TRUE)[1:50]
-#Run the heat map with the function pheatmap
-p20<-pheatmap(vsd_assay[select,col_order], 
-              cluster_rows = FALSE, 
-              show_rownames = FALSE, 
-              cluster_cols = FALSE, 
-              show_colnames = FALSE,
-              annotation_col = df,
-              annotation_colors=ann_colors,
-              cellwidth = 9,
-              fontsize = 16)
+```{r figGOdata-gonads}
+gon_go_sums_SBG <- read.csv("plot_data/GO_freq_SBG_Gonads.csv")
+```
 
-save_pheatmap_pdf(p20, "figs/FigS1_top50_heatmap.pdf",width=6,height=6)
+```{r figGO-sbg-gonads}
+pdf("figs/FigGO_SBGbarplot_GON.pdf",height=10, width=16)
+
+gon_go_sums_SBG$prot_class[gon_go_sums_SBG$prot_class=="unclassified"]<- " unclassified"
+gon_go_sums_SBG$prot_class[gon_go_sums_SBG$prot_class=="other"]<- " other"
+
+ggplot(gon_go_sums_SBG, 
+       aes(fct_rev(prot_class), prop, fill = tissue)) +   
+  geom_bar(position = "dodge", stat="identity") +
+  scale_fill_manual(values = organ_cols) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black"),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1,size=20),
+        axis.text.y = element_text(size=15, hjust = 0.5, 
+                                   margin = margin(b = 20),
+                                   vjust = 0.75),
+        text=element_text(size=20),
+        legend.position = "bottom",
+        axis.ticks.length.y = unit(.25, "cm")) +
+  coord_flip() + 
+  labs(y="Proportion of sex-biased genes", x="")
+
+dev.off()
+
 ```
 
 ## Fig. S2 - TPMs and logFC
