@@ -2132,7 +2132,7 @@ for(class in unique(all_go_sums$prot_class)){
 #Change format of "Unclassified so it will come first"
 all_go_sums$prot_class[all_go_sums$prot_class=="Unclassified"] <-  " unclassified"
 
-#write.csv(all_go_sums, "data/GO_freq_SBG.csv", row.names = FALSE)
+#write.csv(all_go_sums, "data/GO_freq_SBG_Gonads.csv", row.names = FALSE)
 
 #Generate the GO plot
 organ_cols <- c("Ovary" = "#7fc97f", "Testes" = "#beaed4")
@@ -2153,7 +2153,7 @@ ggplot(all_go_sums,
   labs(y="Proportion of sex-biased genes", x="")
 ```
 
-For the over representation analysis I need the list of ovary and testis BLAST results in seperate .txt files:
+For the over representation analysis I need the list of ovary and testis BLAST results in separate .txt files:
 
 ```{r export-danio-geneID-gonadsINDV, eval=FALSE}
 
