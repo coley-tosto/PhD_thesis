@@ -1094,22 +1094,18 @@ dev.off()
 ```{r figTD, message=FALSE}
 figTDa <- image_ggplot(image_read_pdf('figs/FigTD_bias_boxplots.pdf'),interpolate = TRUE)
 figTDb <- image_ggplot(image_read_pdf('figs/Fig_TDvFC.pdf'),interpolate = TRUE)
+figTDc <- image_ggplot(image_read_pdf("figs/Fig_var_expression.pdf"), interpolate = TRUE)
 
-figTD <- plot_grid(figTDa,
-                   figTDb,
-                   nrow = 
-          figTAUc,
-          nrow = 2,
-          labels = c("", "C"))
 figTD <- wrap_plots(figTDa,
                     figTDb,
-                    nrow = 2)
+                    figTDc,
+                    nrow = 3)
 
 figTD <- figTD + plot_annotation(tag_levels = 'A')
 #figTD
 
-ggsave("figs/FigTD.pdf",figTD, height = 8, width=9)
-ggsave("figs/FigTD.png",figTD, height = 8, width=9)
+ggsave("figs/FigTD.pdf",figTD, height = 12, width=9)
+ggsave("figs/FigTD.png",figTD, height = 12, width=9)
 
 ```
 
