@@ -26,6 +26,7 @@ knitr::opts_knit$set(root.dir='../',fig_path="../imgs/")
 library(DESeq2)
 library(pheatmap)
 library(RColorBrewer)
+library(PCAtools)
 library(spfTools)
 library(ggpubr)
 library(cowplot)
@@ -122,7 +123,7 @@ We can also generate a heat map to look ar overall expression levels across our 
 
 #Pull out the top 20 rows with the most expression
 select <- order(rowMeans(counts(dds_FU_exp, normalized = TRUE)),
-                decreasing = TRUE)[1:20]
+                decreasing = TRUE)[1:50]
 df <- as.data.frame(colData(dds_FU)[,c("Sex", "Organ")])
 
 #Transform the data
@@ -209,6 +210,7 @@ pca_plotting_data<-as.data.frame(pca$x)
 #Add the metadata to the PCA dataset
 pca_plotting_data$Organ <- FU_samples$Organ
 pca_plotting_data$Sex <- FU_samples$Sex
+pca_plotting_data$ID <- FU_samples$ID
 
 #Calculate the percent variation attributed to each axis 
 percentVar <- round(p$variance, digits = 2)
@@ -270,6 +272,251 @@ ggplot(pca_plotting_data, aes(x=PC1, y=PC4, color = Organ, shape = Sex)) +
              linetype = 'dashed') +
   geom_vline(xintercept = 0,
              linetype = 'dashed')
+```
+
+#### Saving the PCA plots to use in figure creation
+I will be including the PCAs describing the relationship between PC1 - 3 in the main text, as they account for the majority of the differences between our samples. The plot with PC1 and PC4 I still want to export, and will likely include as a supplemental to highlight why samples related to 11M4 will be removed from the subsequent analyses.
+
+```{r setParams-PCAs}
+#Setting the shapes I want to show up for the different organs
+organ_shapes <- c(Gill = 16, Liver = 17, Gonad = 15)
+
+#Setting the colors I want for each sex
+sex_cols <- c("F" = "#7fc97f", "M" = "#beaed4")
+
+```
+
+```{r figPCA1v2, eval = FALSE}
+#Create the blank pdf to store the plot in
+pdf("docs/figs/Fig_PCA1v2.pdf",height = 6,width=6)
+
+#Set the plotting parameters
+par(mar=c(4,5,4,1), oma=c(2,2,2,2))
+
+#Create the plot for PC1 v PC2
+plot(pca_plotting_data$PC1,
+     pca_plotting_data$PC2,
+     col = paste0(sex_cols[pca_plotting_data$Sex],"75"),
+     pch = organ_shapes[pca_plotting_data$Organ],
+     cex = 2,
+     cex.lab = 2,
+     cex.axis = 1.75,
+     xlab = paste0("PC1: ",percentVar[1], "% variance"),
+     ylab = paste0("PC2: ",percentVar[2], "% variance"),
+     bty = 'l',
+     xpd = TRUE)
+
+#Add a legend describing the sex
+outer_legend("top",
+             c("Female","Male"),
+             pch = 18,
+             bty = 'n',
+             col=paste0(sex_cols,"75"),
+             cex = 1.75,
+             ncol = 2,
+             pt.cex = 3)
+
+dev.off()
+```
+
+```{r figPCA1v3, eval = FALSE}
+#Create the blank pdf to store the plot in
+pdf("docs/figs/Fig_PCA1v3.pdf",height = 6,width=6)
+
+#Set the plotting parameters
+par(mar=c(4,5,4,1), oma=c(2,2,2,2))
+
+#Create the plot for PC1 v PC3
+plot(pca_plotting_data$PC1,
+     pca_plotting_data$PC3,
+     col = paste0(sex_cols[pca_plotting_data$Sex],"75"),
+     pch = organ_shapes[pca_plotting_data$Organ],
+     cex = 2,
+     cex.lab = 2,
+     cex.axis = 1.75,
+     xlab = paste0("PC1: ",percentVar[1], "% variance"),
+     ylab = paste0("PC3: ",percentVar[3], "% variance"),
+     bty = 'l',
+     xpd = TRUE)
+
+#Add  legend describing the organs
+outer_legend("top",
+             c("Gill","Gonad","Liver"),
+             pch = c(16,15,17),
+             bty = 'n',
+             col = 'darkgrey',
+             cex = 1.75,
+             ncol = 3,
+             pt.cex = 3)
+
+dev.off()
+```
+
+```{r figPCA1v4, eval = FALSE}
+#Create the blank pdf to store the plot in
+pdf("docs/figs/Fig_PCA1v4.pdf",height = 6,width=8)
+
+#Set the plotting parameters
+par(mar=c(4,5,1,5),oma=c(2,2,2,2))
+
+#Create the plot for PC1 v PC4
+plot(pca_plotting_data$PC1,
+     pca_plotting_data$PC4,
+     col = paste0(sex_cols[pca_plotting_data$Sex],"75"),
+     pch = organ_shapes[pca_plotting_data$Organ],
+     cex = 2,
+     cex.lab = 2,
+     cex.axis = 1.75,
+     xlab = paste0("PC1: ",percentVar[1], "% variance"),
+     ylab = paste0("PC4: ",percentVar[4], "% variance"),
+     bty = 'l',
+     xpd = TRUE)
+
+text(pca_plotting_data$PC1[pca_plotting_data$ID == "FUG11M4"] + 50,
+     pca_plotting_data$PC4[pca_plotting_data$ID == "FUG11M4"] - 25,
+     labels = pca_plotting_data$ID[pca_plotting_data$ID == "FUG11M4"])
+
+#Add  legend describing the organs and sex
+outer_legend("right",
+             c("Gill","Gonad","Liver"),
+             pch = c(16,15,17),
+             bty = 'n',
+             col = 'darkgrey',
+             cex = 1.5,
+             ncol = 1,
+             pt.cex = 2.25)
+
+outer_legend("topright",
+             c("Female","Male"),
+             pch = 18,
+             bty = 'n',
+             col=paste0(sex_cols,"75"),
+             cex = 1.5,
+             ncol = 1,
+             pt.cex = 2.25)
+dev.off()
+```
+
+#### Creating heatmaps based on the PCA axes
+I now want to generate heatmaps based on the genes that have the highest loadings for each of the PCA axes. I will be using a cut off of 0.02 to determine which genes will be includd in the heatmaps. Once again I am doing this for PCA1-4, but will likely only inlcude PCA1-3 in a figure for the maintext and PC4 will go in the supplemental.
+
+```{r setParams-heatmaps}
+
+df <- as.data.frame(FU_samples[,c("Sex", "Organ")])
+rownames(df) <- FU_samples$ID
+df$Organ <- as.character(df$Organ)
+
+organ_cols<-c("Gill" = "#20B2AA",
+              "Gonad" = "#EEB422", 
+              "Liver" = "#EE8262")
+
+ann_colors = list(Sex=sex_cols,
+                  Organ=organ_cols)
+
+col_order <- c(rownames(df[df$Sex=="F" & df$Organ=="Gill",]),
+               rownames(df[df$Sex=="M" & df$Organ=="Gill",]),
+               rownames(df[df$Sex=="F" & df$Organ=="Gonad",]),
+               rownames(df[df$Sex=="M" & df$Organ=="Gonad",]),
+               rownames(df[df$Sex=="F" & df$Organ=="Liver",]),
+               rownames(df[df$Sex=="M" & df$Organ=="Liver",]))
+
+pca_rotation <- pca$rotation[, 1:4]
+
+```
+
+```{r savePheatmapFxn}
+
+#Function to use to export the heatmaps to pdfs
+# from https://stackoverflow.com/questions/43051525/how-to-draw-pheatmap-plot-to-screen-and-also-save-to-file
+save_pheatmap_pdf <- function(x, filename, width=7, height=7) {
+  stopifnot(!missing(x))
+  stopifnot(!missing(filename))
+  pdf(filename, width=width, height=height)
+  grid::grid.newpage()
+  grid::grid.draw(x$gtable)
+  dev.off()
+}
+
+```
+
+```{r figheatmap-PC1}
+
+pc1 <- pheatmap(assay(vsd)[which(abs(pca_rotation[,1]) >= 0.02), col_order], 
+                cluster_rows = FALSE, 
+                show_rownames = FALSE, 
+                cluster_cols = FALSE, 
+                show_colnames = FALSE,
+                annotation_col = df,
+                annotation_colors = ann_colors,
+                cellwidth = 9,
+                fontsize = 16,
+                annotation_legend = FALSE,
+                main = "Top loading genes on PC1")
+
+save_pheatmap_pdf(pc1, "docs/figs/Fig_pc1_heatmap.pdf",
+                  width=6,
+                  height=6)
+
+```
+
+```{r figheatmap-PC2}
+
+pc2 <- pheatmap(assay(vsd)[which(abs(pca_rotation[,2]) >= 0.02), col_order], 
+                cluster_rows = FALSE, 
+                show_rownames = FALSE, 
+                cluster_cols = FALSE, 
+                show_colnames = FALSE,
+                annotation_col = df,
+                annotation_colors=ann_colors,
+                cellwidth = 9,
+                fontsize = 16,
+                annotation_legend = FALSE,
+                main = "Top loading genes on PC2")
+
+save_pheatmap_pdf(pc2, "docs/figs/Fig_pc2_heatmap.pdf",
+                  width=6,
+                  height=6)
+
+```
+
+```{r figheatmap-PC3}
+
+pc3 <- pheatmap(assay(vsd)[which(abs(pca_rotation[,3]) >= 0.02), col_order], 
+                cluster_rows = FALSE, 
+                show_rownames = FALSE, 
+                cluster_cols = FALSE, 
+                show_colnames = FALSE,
+                annotation_col = df,
+                annotation_colors=ann_colors,
+                cellwidth = 9,
+                fontsize = 16,
+                border_color = NA,
+                main = "Top loading genes on PC3")
+
+save_pheatmap_pdf(pc3, "docs/figs/Fig_pc3_heatmap.pdf",
+                  width=6,
+                  height=6)
+
+```
+
+```{r figheatmap-PC4}
+
+pc4 <- pheatmap(assay(vsd)[which(abs(pca_rotation[,4]) >= 0.02), col_order], 
+                cluster_rows = FALSE, 
+                show_rownames = FALSE, 
+                cluster_cols = FALSE, 
+                show_colnames = FALSE,
+                annotation_col = df,
+                annotation_colors=ann_colors,
+                cellwidth = 9,
+                fontsize = 16,
+                border_color = NA,
+                main = "Top loading genes on PC4")
+
+save_pheatmap_pdf(pc4, "docs/figs/Fig_pc4_heatmap.pdf",
+                  width=6,
+                  height=6)
+
 ```
 
 # Multifactor design - Comparing M v F across the diff tissue types
