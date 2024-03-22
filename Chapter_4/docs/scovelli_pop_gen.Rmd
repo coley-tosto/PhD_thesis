@@ -161,6 +161,9 @@ logFC_TD <- logFC_TD[!(is.na(logFC_TD$Tajima)),]
 #Remove all of the sex-specific genes from the dataset (Only interested in sex-biased)
 logFC_TD <- logFC_TD[logFC_TD$bias_cat != "Sex-specific", ]
 
+#Remove the brain from the dataset
+logFC_TD <- logFC_TD[logFC_TD$tissue != "Brain", ]
+
 #Export this merged dataset to use for making figures
 #write.csv(logFC_TD, "data/sexbias_tajD.csv", row.names = FALSE)
 
@@ -228,6 +231,18 @@ skewness(resid(td_aov)) #almost 2
 kurtosis(resid(td_aov)) #8.6, pretty high, both values not showing normal distribution
 
 ```
+
+Unsurprisingly, the data violate two of the major assumptions for an ANVOA, there is no homogeneity of variances and the residuals are not normally distributed
+
+```{r}
+test <- aggregate(logFC_TD$Tajima,
+                  by = list(b = logFC_TD$bias,
+                            t = logFC_TD$tissue),
+                  FUN = mean)
+
+friedman.test(x ~ b | t, data = test)
+```
+
 
 
 ### Modeling the relationship between sex-biased gene expression and Tajima's D

@@ -28,6 +28,8 @@ library(pheatmap)
 library(RColorBrewer)
 library(PCAtools)
 library(spfTools)
+library(magick)
+library(patchwork)
 library(ggpubr)
 library(cowplot)
 library(UpSetR)
@@ -439,7 +441,7 @@ save_pheatmap_pdf <- function(x, filename, width=7, height=7) {
 
 ```
 
-```{r figheatmap-PC1}
+```{r figheatmap-PC1, eval = FALSE}
 
 pc1 <- pheatmap(assay(vsd)[which(abs(pca_rotation[,1]) >= 0.02), col_order], 
                 cluster_rows = FALSE, 
@@ -459,7 +461,7 @@ save_pheatmap_pdf(pc1, "docs/figs/Fig_pc1_heatmap.pdf",
 
 ```
 
-```{r figheatmap-PC2}
+```{r figheatmap-PC2, eval=FALSE}
 
 pc2 <- pheatmap(assay(vsd)[which(abs(pca_rotation[,2]) >= 0.02), col_order], 
                 cluster_rows = FALSE, 
@@ -479,7 +481,7 @@ save_pheatmap_pdf(pc2, "docs/figs/Fig_pc2_heatmap.pdf",
 
 ```
 
-```{r figheatmap-PC3}
+```{r figheatmap-PC3, eval=FALSE}
 
 pc3 <- pheatmap(assay(vsd)[which(abs(pca_rotation[,3]) >= 0.02), col_order], 
                 cluster_rows = FALSE, 
@@ -499,7 +501,7 @@ save_pheatmap_pdf(pc3, "docs/figs/Fig_pc3_heatmap.pdf",
 
 ```
 
-```{r figheatmap-PC4}
+```{r figheatmap-PC4, eval=FALSE}
 
 pc4 <- pheatmap(assay(vsd)[which(abs(pca_rotation[,4]) >= 0.02), col_order], 
                 cluster_rows = FALSE, 
@@ -517,6 +519,38 @@ save_pheatmap_pdf(pc4, "docs/figs/Fig_pc4_heatmap.pdf",
                   width=6,
                   height=6)
 
+```
+
+#### Making the combined figure
+
+```{r assembleFigPCA, message=FALSE}
+figPCAa <- image_ggplot(image_read_pdf('docs/figs/Fig_PCA1v2.pdf'),
+                        interpolate = TRUE)
+figPCAb <- image_ggplot(image_read_pdf('docs/figs/Fig_PCA1v3.pdf'),
+                        interpolate = TRUE)
+figPCAc <- image_ggplot(image_read_pdf('docs/figs/Fig_pc1_heatmap.pdf'),
+                        interpolate = TRUE)
+figPCAd <- image_ggplot(image_read_pdf('docs/figs/Fig_pc2_heatmap.pdf'),
+                        interpolate = TRUE)
+figPCAe <- image_ggplot(image_read_pdf('docs/figs/Fig_pc3_heatmap.pdf'),
+                        interpolate = TRUE)
+
+# make two patchworks
+pcas <- figPCAa + figPCAb
+hms <- figPCAc + figPCAd + figPCAe
+
+# put the patchworks together
+figPCA <-  wrap_plots(pcas,
+                      hms,
+                      ncol=1) + 
+  plot_annotation(tag_levels = 'A') 
+
+ggsave("docs/figs/FigPCA.pdf", figPCA, height=4, width=5)
+ggsave("docs/figs/FigPCA.png", figPCA, height=4, width=5) # also save as a png
+```
+
+```{r showAssembledFigPCA, eval=TRUE}
+knitr::include_graphics("docs/figs/FigPCA.png")
 ```
 
 # Multifactor design - Comparing M v F across the diff tissue types
