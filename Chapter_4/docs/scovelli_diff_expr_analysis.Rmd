@@ -1722,6 +1722,9 @@ blast_long_SS <- data.frame(
 #write.csv(blast_long_SS, "SS_BLAST_results_sex_specific.csv", row.names = FALSE)
 ```
 
+## Investigating expression of some sex-specific genes
+
+
 ## Reading in the PANTHER results - Sex-biased Genes
 In PANTHER I uploaded the `SS_GOnames_SBG.txt` file, selected _Danio rerio_ as the organism, and then chose "Functional classification viewed in gene list" as the analysis type. 
 
@@ -2043,6 +2046,7 @@ ggplot(all_go_sums_liver,
   coord_flip() + 
   labs(y="Proportion of sex-biased genes", x="")
 ```
+
 ## Running the gene ontology analysis for the GONADS only
 I want to look further into differences between the testis and the ovaries in terms of what GO terms are represented in the sex-biased genes and to also conduct an over representation analysis for them individually. To do that I am going to walk through some of the same steps highlighted above, but now just for the testis and ovaries.
 
