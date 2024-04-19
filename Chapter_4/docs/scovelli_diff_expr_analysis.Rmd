@@ -1450,7 +1450,7 @@ I then exported all of the blast results as .txt files from the RCC and need to 
 blast_path <- "data/scovelli_BLAST/"
 
 #Create a list of the files I want
-SS_blast_files <- list.files(blast_path, pattern = "reiro")
+SS_blast_files <- list.files(blast_path, pattern = "biased")
 
 #Create an empty list to store my datasets in
 SS_blast_list <- list()
@@ -1908,6 +1908,141 @@ ggplot(all_go_sums,
   labs(y="Proportion of sex-biased genes", x="")
 ```
 
+## Looking at GO groups for the male- and female-biased genes
+
+```{r plot-panther-SBG-skin}
+#Calculate the frequency at which each protein class occurs within the different tissue types
+##Create an empty dataset to store the values in
+all_go_sums_skin <- data.frame(matrix(ncol = 5,
+                                      nrow = 0))
+
+##Add appropriate column names
+colnames(all_go_sums_skin) <- c(colnames(all_go_dat),
+                                "prop")
+
+##Loop through each bias type to calculate frequencies
+for (bias in c("SS_femS_biased_TRgenes_reiro_blast",
+               "SS_malS_biased_TRgenes_reiro_blast")) {
+  
+  tmp <- all_go_dat[all_go_dat$bias_cat == bias, ]
+  
+  #Calculate the respective proportion for each protein class
+  tmp$prop <- tmp$Freq/sum(tmp$Freq)
+  
+  #Export the data to the previously created dataframe
+  all_go_sums_skin <- rbind(tmp, all_go_sums_skin)
+  
+}
+
+
+#Change all of the protein classes that have a frequency of less than 0.02 to "Other"
+for(class in unique(all_go_sums_skin$Var1)){
+  
+  #Pull out the rows that contain that protein class
+  match_rows <- which(all_go_sums_skin$Var1==class)
+  
+  #If any of the proportions associated with those rows is less than 0.01, classify as other
+  if(any(all_go_sums_skin$prop[match_rows]>0.01)==FALSE){
+    
+    all_go_sums_skin$Var1[match_rows] <- " other"
+    
+  }
+}
+
+#Change format of "Unclassified so it will come first"
+all_go_sums_skin$Var1[all_go_sums_skin$Var1=="Unclassified"] <-  " unclassified"
+
+#write.csv(all_go_sums, "data/GO_freq_SBG.csv", row.names = FALSE)
+
+#Generate the GO plot
+bias_col <- c("SS_femS_biased_TRgenes_reiro_blast" = "#7fc97f", 
+               "SS_malS_biased_TRgenes_reiro_blast" = "#beaed4")
+
+ggplot(all_go_sums_skin, 
+       aes(fct_rev(Var1), prop, fill = bias_cat)) +   
+  geom_bar(position = "dodge", stat="identity") +
+  scale_fill_manual(values = bias_col) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black"),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1,size=20),
+        axis.text.y = element_text(size=15, hjust = 1, 
+                                   #margin = margin(b = 20),
+                                   vjust = 0.3),
+        text=element_text(size=20),
+        legend.position = "bottom",
+        axis.ticks.length.y = unit(.25, "cm")) +
+  coord_flip() + 
+  labs(y="Proportion of sex-biased genes", x="")
+```
+
+```{r plot-panther-SBG-liver}
+#Calculate the frequency at which each protein class occurs within the different tissue types
+##Create an empty dataset to store the values in
+all_go_sums_liver <- data.frame(matrix(ncol = 5,
+                                      nrow = 0))
+
+##Add appropriate column names
+colnames(all_go_sums_liver) <- c(colnames(all_go_dat),
+                                "prop")
+
+##Loop through each bias type to calculate frequencies
+for (bias in c("SS_femL_biased_TRgenes_reiro_blast",
+               "SS_malL_biased_TRgenes_reiro_blast")) {
+  
+  tmp <- all_go_dat[all_go_dat$bias_cat == bias, ]
+  
+  #Calculate the respective proportion for each protein class
+  tmp$prop <- tmp$Freq/sum(tmp$Freq)
+  
+  #Export the data to the previously created dataframe
+  all_go_sums_liver <- rbind(tmp, all_go_sums_liver)
+  
+}
+
+
+#Change all of the protein classes that have a frequency of less than 0.02 to "Other"
+for(class in unique(all_go_sums_liver$Var1)){
+  
+  #Pull out the rows that contain that protein class
+  match_rows <- which(all_go_sums_liver$Var1==class)
+  
+  #If any of the proportions associated with those rows is less than 0.01, classify as other
+  if(any(all_go_sums_liver$prop[match_rows]>0.01)==FALSE){
+    
+    all_go_sums_liver$Var1[match_rows] <- " other"
+    
+  }
+}
+
+#Change format of "Unclassified so it will come first"
+all_go_sums_liver$Var1[all_go_sums_liver$Var1=="Unclassified"] <-  " unclassified"
+
+#write.csv(all_go_sums, "data/GO_freq_SBG.csv", row.names = FALSE)
+
+#Generate the GO plot
+bias_col <- c("SS_femL_biased_TRgenes_reiro_blast" = "#7fc97f", 
+               "SS_malL_biased_TRgenes_reiro_blast" = "#beaed4")
+
+ggplot(all_go_sums_liver, 
+       aes(fct_rev(Var1), prop, fill = bias_cat)) +   
+  geom_bar(position = "dodge", stat="identity") +
+  scale_fill_manual(values = bias_col) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black"),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1,size=20),
+        axis.text.y = element_text(size=15, hjust = 1, 
+                                   #margin = margin(b = 20),
+                                   vjust = 0.3),
+        text=element_text(size=20),
+        legend.position = "bottom",
+        axis.ticks.length.y = unit(.25, "cm")) +
+  coord_flip() + 
+  labs(y="Proportion of sex-biased genes", x="")
+```
 ## Running the gene ontology analysis for the GONADS only
 I want to look further into differences between the testis and the ovaries in terms of what GO terms are represented in the sex-biased genes and to also conduct an over representation analysis for them individually. To do that I am going to walk through some of the same steps highlighted above, but now just for the testis and ovaries.
 
