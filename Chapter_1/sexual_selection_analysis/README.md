@@ -1,0 +1,2 @@
+# Comparing mating systems and sexual selection pressures across three congeneric species of pipefish that span the continuum of sexual dimorphism
+This directory contains information about how I generated the calculations of sexual selection for three species of pipefish from the genus _Syngnathus_. Calculations of fitness were generated from the results of the parentage analysis fo _Synanthus floridae_ and _Synganthus fuscus_. Publicly accesible data was pulled for the comparisson of _Synganthus scovelli_.
