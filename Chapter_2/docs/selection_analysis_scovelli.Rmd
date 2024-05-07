@@ -1,0 +1,830 @@
+---
+title: "Selection pressures in _Syngnathus scovelli_"
+author: "Coley Tosto"
+date: "`r Sys.Date()`"
+output:
+  bookdown::pdf_document2:
+    fig_caption: yes
+    keep_tex: yes
+    number_sections: no
+    toc: false
+header-includes: >
+  \usepackage{lipsum}
+  \usepackage{float}
+  \floatplacement{figure}{H}
+editor_options:
+  chunk_output_type: console
+#bibliography: references.bib  
+---
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir='../',
+                     fig_path="../figs/")
+```
+
+``` {r library, message = FALSE, warning = FALSE}
+#This is a cohesive list of all the libraries used in this document
+library(ggplot2)
+library(fBasics)
+library(pwr)
+```
+
+``` {r read-data, message = FALSE, warning = FALSE}
+#Metadata for males and females from the mesocosm experiments
+fem_meso <- read.csv("data/all_fem_meso_scovelli.csv")
+mal_meso <- read.csv("data/all_mal_meso_scovelli.csv")
+
+```
+
+# Calculating the degree of sexual dimorphism
+
+```{r sd-assumption-test, eval=FALSE}
+#Testing to see if the variances are equal
+var.test(fem_meso$length, mal_meso$length) #not equal
+
+#Testing for normal distribution
+normalTest(fem_meso$length, method = "da") #normal
+normalTest(mal_meso$length, method = "da") #normal
+
+```
+
+Variances are not equal but they are normally distributed so I will run a t-test with unequal variances.
+
+```{r sd-t-tests, eval=FALSE}
+t.test(fem_meso$length, mal_meso$length, 
+       var.equal = FALSE) #Sig. difference
+
+```
+
+
+# Cleaning the datasets
+For the male dataset I want to do a few things before using it: 
+  1. Remove the two males that died (C1M5 and C6M2).
+  2. Replace all of the "NAs" present in the males who didn't mate with 0's when appropriate.
+  3. Add a column of mating success to the dataset. This will be either a 0 or 1 as _S. scovelli_ males only mate once.
+
+In the female dataset I am going to remove C1F2 since she doesn't have any data related to her reproductive success.
+
+For both the male and the female datasets I also want to subset them out to only include the control fish and not fish that were exposed to estrogen.
+
+```{r clean-datasets}
+#Subset the datasets to remove the fish exposed to estrogen
+fem_succ <- fem_meso[grep("C", fem_meso$trial_num),]
+mal_succ <- mal_meso[grep("C", fem_meso$trial_num),]
+
+#Adding full fishIDs to make removing individuals easier
+fem_succ$femID <- paste0(fem_succ$trial_num, "F",
+                         fem_succ$fishID)
+mal_succ$maleID <- paste0(mal_succ$trial_num, "M",
+                          mal_succ$fishID)
+#Removing the one female
+fem_succ <- subset(fem_succ, !(femID %in% "C1F2"))
+
+#Removing the two males who died
+mal_succ <- subset(mal_succ, !(maleID %in% c("C1M5", "C6M2")))
+
+#Replace NAs with 0s in the columns related to fitness
+mal_succ[,5:7] <- sapply(mal_succ[,5:7],
+                           function(x)
+                             ifelse(is.na(x), 0, x))
+
+#Add a column for males to denote mating success
+mal_succ$MatingSuccess <- ifelse(mal_succ$totalEggs > 0, 
+                                 1, 
+                                 0)
+
+```
+
+# Summary statistics for successfully mated individuals
+## Males
+Across all `r length(unique(mal_succ$trial_num))` trials and `r nrow(mal_succ)` total males, there were `r nrow(mal_succ[mal_succ$MatingSuccess == 1,])` males that mated. 
+
+Looking across all males, including the ones that did not mate, this is what we find as the mean, sd, and se for the number of embryos transferred and how many of those developed versus didn't:
+
+|                  | mean| SD| SE| max | min |
+|:-----------------|----:|---:|----:|----:|----:|
+|Number of Embryos | `r mean(mal_succ$totalEggs)`|`r sd(mal_succ$totalEggs)`|  `r sd(mal_succ$totalEggs)/sqrt(nrow(mal_succ))`|`r max(mal_succ$totalEggs)` | `r min(mal_succ$totalEggs)`|
+|Developed Embryos | `r mean(mal_succ$NumDeveloped)`|`r sd(mal_succ$NumDeveloped)`|  `r sd(mal_succ$NumDeveloped)/sqrt(nrow(mal_succ))`|`r max(mal_succ$NumDeveloped)` | `r min(mal_succ$NumDeveloped)`|
+|Undeveloped Embryos| `r mean(mal_succ$NumUndeveloped)`|`r sd(mal_succ$NumUndeveloped)`|  `r sd(mal_succ$NumUndeveloped)/sqrt(nrow(mal_succ))`|`r max(mal_succ$NumUndeveloped)` | `r min(mal_succ$NumUndeveloped)`|
+
+These values will be influenced by the number of 0s coming from males who did not mate. So let's look at the same thing, but this time for only males who had at least one successful mating:
+
+|                  | mean| SD| SE|  max | min |
+|:-----------------|----:|---:|----:|----:|----:|
+|Number of Embryos | `r mean(mal_succ$totalEggs[mal_succ$MatingSuccess == 1])`|`r sd(mal_succ$totalEggs[mal_succ$MatingSuccess == 1])`|  `r sd(mal_succ$totalEggs[mal_succ$MatingSuccess == 1])/sqrt(nrow(mal_succ[mal_succ$MatingSuccess == 1,]))`| `r max(mal_succ$totalEggs[mal_succ$MatingSuccess == 1])` | `r min(mal_succ$totalEggs[mal_succ$MatingSuccess == 1])` |
+|Developed Embryos | `r mean(mal_succ$NumDeveloped[mal_succ$MatingSuccess == 1])`|`r sd(mal_succ$NumDeveloped[mal_succ$MatingSuccess == 1])`|  `r sd(mal_succ$NumDeveloped[mal_succ$MatingSuccess == 1])/sqrt(nrow(mal_succ[mal_succ$MatingSuccess == 1,]))`|`r max(mal_succ$NumDeveloped[mal_succ$MatingSuccess == 1])` | `r min(mal_succ$NumDeveloped[mal_succ$MatingSuccess == 1])` |
+|Undeveloped Embryos| `r mean(mal_succ$NumUndeveloped[mal_succ$MatingSuccess == 1])`|`r sd(mal_succ$NumUndeveloped[mal_succ$MatingSuccess == 1])`|  `r sd(mal_succ$NumUndeveloped[mal_succ$MatingSuccess == 1])/sqrt(nrow(mal_succ[mal_succ$MatingSuccess == 1,]))`| `r max(mal_succ$NumUndeveloped[mal_succ$MatingSuccess == 1])` | `r min(mal_succ$NumUndeveloped[mal_succ$MatingSuccess == 1])` |
+
+## Females
+Across all `r length(unique(fem_succ$trial_num))` trials and `r nrow(fem_succ)` total females, there were `r nrow(fem_succ[fem_succ$MatingSuccess != 0,])` females that mated at least one time, and `r nrow(fem_succ[fem_succ$MatingSuccess == 2,])` of those females mated twice. 
+
+Looking across all females, including the ones that did not mate, this is what we find as the mean, sd, and se for the total number of embryos transferred from each female (across all of her mates if applicable) and how many of those developed versus didn't:
+
+|                  | mean| SD| SE| max | min |
+|:-----------------|----:|---:|----:|----:|----:|
+|Number of Embryos | `r mean(fem_succ$totalEggs)`|`r sd(fem_succ$totalEggs)`|  `r sd(fem_succ$totalEggs)/sqrt(nrow(fem_succ))`|`r max(fem_succ$totalEggs)` | `r min(fem_succ$totalEggs)`|
+|Developed Embryos | `r mean(fem_succ$NumDeveloped)`|`r sd(fem_succ$NumDeveloped)`|  `r sd(fem_succ$NumDeveloped)/sqrt(nrow(fem_succ))`|`r max(fem_succ$NumDeveloped)` | `r min(fem_succ$NumDeveloped)`|
+|Undeveloped Embryos| `r mean(fem_succ$NumUndeveloped)`|`r sd(fem_succ$NumUndeveloped)`|  `r sd(fem_succ$NumUndeveloped)/sqrt(nrow(fem_succ))`|`r max(fem_succ$NumUndeveloped)` | `r min(fem_succ$NumUndeveloped)`|
+
+These values will be influenced by the number of 0s coming from females who did not mate. So let's look at the same thing, but this time for only females who had at least one successful mating:
+
+|                  | mean| SD| SE|  max | min |
+|:-----------------|----:|---:|----:|----:|----:|
+|Number of Embryos | `r mean(fem_succ$totalEggs[fem_succ$MatingSuccess != 0])`|`r sd(fem_succ$totalEggs[fem_succ$MatingSuccess != 0])`|  `r sd(fem_succ$totalEggs[fem_succ$MatingSuccess != 0])/sqrt(nrow(fem_succ[fem_succ$MatingSuccess != 0,]))`| `r max(fem_succ$totalEggs[fem_succ$MatingSuccess != 0])` | `r min(fem_succ$totalEggs[fem_succ$MatingSuccess != 0])` |
+|Developed Embryos | `r mean(fem_succ$NumDeveloped[fem_succ$MatingSuccess != 0])`|`r sd(fem_succ$NumDeveloped[fem_succ$MatingSuccess != 0])`|  `r sd(fem_succ$NumDeveloped[fem_succ$MatingSuccess != 0])/sqrt(nrow(fem_succ[fem_succ$MatingSuccess != 0,]))`|`r max(fem_succ$NumDeveloped[fem_succ$MatingSuccess != 0])` | `r min(fem_succ$NumDeveloped[fem_succ$MatingSuccess != 0])` |
+|Undeveloped Embryos| `r mean(fem_succ$NumUndeveloped[fem_succ$MatingSuccess != 0])`|`r sd(fem_succ$NumUndeveloped[fem_succ$MatingSuccess != 0])`|  `r sd(fem_succ$NumUndeveloped[fem_succ$MatingSuccess != 0])/sqrt(nrow(fem_succ[fem_succ$MatingSuccess != 0,]))`| `r max(fem_succ$NumUndeveloped[fem_succ$MatingSuccess != 0])` | `r min(fem_succ$NumUndeveloped[fem_succ$MatingSuccess != 0])` |
+
+# Episode of Sexual Selection
+## Partitioning the Total Opportunity for Selection (I)
+```{r opp-selection-females}
+#Create a dataframe to store all of the intermediate values of fitness in
+fem_succ_fitness <- data.frame(matrix(ncol = ncol(fem_succ) + 9,
+                                      nrow = 0))
+colnames(fem_succ_fitness) <- c(colnames(fem_succ),
+                                "w1", "w1_squared",
+                                "W2", "W2_bar", "w2",
+                                "W3", "W3_bar", "w3", "i3")
+
+#Create a dataframe to store the final calculations of I in
+opp_selection_episodes_fem <- data.frame(matrix(ncol = 12,
+                                            nrow = 0))
+colnames(opp_selection_episodes_fem) <- c("trial_num", "I_1", "I_1per", "I_2", "I_2per", 
+                                          "I_3", "I_3per", "I_12", "I_12per",
+                                          "I", "Iper", "I_s")
+
+for (trial in unique(fem_succ$trial_num)) {
+  
+  #Subset the overall dataframe to work with an individual trial
+  tmp <- fem_succ[fem_succ$trial_num == trial, ]
+  
+  #Calculate the absolute pre-copulatory fitness (Eq. 14 Arnold & Wade 1984)
+  tmp$w1 <- tmp$MatingSuccess/mean(tmp$MatingSuccess) #Relative mating success
+  tmp$w1_squared <- (tmp$w1)^2
+  
+  I_1 <- var(tmp$w1) #Variance in relative mating success
+  
+  #Post-copulatory selection event 1 (Number of eggs transferred) (Eq. 15 Arnold & Wade 1984)
+  tmp$W2 <- ifelse(tmp$MatingSuccess > 0,
+                   tmp$totalEggs/tmp$MatingSuccess,
+                   0) #Number of eggs per mate
+  tmp$W2_bar <- tmp$W2 * (tmp$w1/nrow(tmp)) #Number of eggs per mate adjusted by the # of individuals with fitness W
+  tmp$w2 <- tmp$W2/sum(tmp$W2_bar)
+  
+  I_2 <- (sum((tmp$w1 * (tmp$w2)^2))/nrow(tmp) - 1) * nrow(tmp)/(nrow(tmp) - 1)
+  
+  #Post-copulatory selection event 2 (Number of eggs developed) (Eq. 16 Arnold & Wade 1984)
+  tmp$W3 <- ifelse(tmp$totalEggs > 0,
+                   tmp$NumDeveloped/tmp$totalEggs,
+                   0) #Proportion of transferred eggs that developed
+  tmp$W3_bar <- tmp$W3 * ((tmp$totalEggs/mean(tmp$totalEggs))/nrow(tmp)) #Prop. of eggs developed adjusted by the # of individuals with fitness W
+  tmp$w3 <- tmp$W3/sum(tmp$W3_bar)
+  tmp$i3 <- ((tmp$totalEggs/mean(tmp$totalEggs))/nrow(tmp)) * ((tmp$w3 - 1)^2)
+  
+  I_3 <- sum(tmp$i3) * nrow(tmp)/(nrow(tmp) - 1)
+
+  I_12 <- var(tmp$totalEggs)/(mean(tmp$totalEggs)^2)
+  
+  #Total selection
+  I <- var(tmp$NumDeveloped)/(mean(tmp$NumDeveloped)^2)
+  
+  I_s <- var(tmp$MatingSuccess)/(mean(tmp$MatingSuccess)^2)
+  
+  #Calculating percentages for each selection event
+  I_1per <- (I_1/I)*100
+  I_2per <- (I_2/I)*100
+  I_3per <- (I_3/I)*100
+  I_12per <- (I_12/I)*100
+  Iper <- (I/I)*100
+  
+  #Combining all of the selection values (Is) and saving the output
+  trial_num <- as.numeric(gsub("^(C)(\\d)", "\\2",
+                               trial))
+  selection <- cbind(trial_num, I_1, I_1per, I_2, I_2per, I_3, I_3per,
+                     I_12, I_12per, I, Iper, I_s)
+  
+  opp_selection_episodes_fem <- rbind(opp_selection_episodes_fem, selection)
+  
+  #Save the intermediate values
+  fem_succ_fitness <- rbind(fem_succ_fitness, tmp)
+}
+
+#Exporting the data
+#write.csv(fem_succ_fitness, "data/scovelli_int_I_fem.csv", row.names = FALSE)
+```
+
+```{r opp-selection-males}
+#Making sure variables are in the dataset as numeric
+mal_succ$totalEggs <- as.numeric(mal_succ$totalEggs)
+mal_succ$NumDeveloped <- as.numeric(mal_succ$NumDeveloped)
+mal_succ$NumUndeveloped <- as.numeric(mal_succ$NumUndeveloped)
+mal_succ$MatingSuccess <- as.numeric(mal_succ$MatingSuccess)
+
+#Create a dataframe to store all of the intermediate values of fitness in
+mal_succ_fitness <- data.frame(matrix(ncol = ncol(mal_succ) + 9,
+                                      nrow = 0))
+colnames(mal_succ_fitness) <- c(colnames(mal_succ),
+                                "w1", "w1_squared",
+                                "W2", "W2_bar", "w2",
+                                "W3", "W3_bar", "w3", "i3")
+
+#Create a dataframe to store the final calculations of I in
+opp_selection_episodes_mal <- data.frame(matrix(ncol = 12,
+                                            nrow = 0))
+colnames(opp_selection_episodes_mal) <- c("trial_num", "I_1", "I_1per", "I_2", "I_2per", 
+                                          "I_3", "I_3per", "I_12", "I_12per",
+                                          "I", "Iper", "I_s")
+
+for (trial in unique(mal_succ$trial_num)) {
+  
+  #Subset the overall dataframe to work with an individual trial
+  tmp <- mal_succ[mal_succ$trial_num == trial, ]
+  
+  #Calculate the absolute pre-copultory fitness (Eq. 14 Arnold & Wade 1984)
+  tmp$w1 <- tmp$MatingSuccess/mean(tmp$MatingSuccess) #Relative mating success
+  tmp$w1_squared <- (tmp$w1)^2
+  
+  I_1 <- var(tmp$w1) #Variance in relative mating success
+  
+  #Post-copulatory selection event 1 (Number of eggs transferred) (Eq. 15 Arnold & Wade 1984)
+  tmp$W2 <- tmp$totalEggs #Number of eggs per mate (same since only 1 mate)
+  tmp$W2_bar <- tmp$W2 * (tmp$w1/nrow(tmp)) #Number of eggs per mate adjusted by the # of individuals with fitness W
+  tmp$w2 <- tmp$W2/sum(tmp$W2_bar)
+  
+  I_2 <- (sum((tmp$w1 * (tmp$w2)^2))/nrow(tmp) - 1) * nrow(tmp)/(nrow(tmp) - 1)
+  
+  #Post-copulatory selection event 2 (Number of eggs developed) (Eq. 16 Arnold & Wade 1984)
+  tmp$W3 <- ifelse(tmp$totalEggs > 0,
+                tmp$NumDeveloped/tmp$totalEggs,
+                   0) #Proportion of transferred eggs that developed
+  tmp$W3_bar <- tmp$W3 * ((tmp$totalEggs/mean(tmp$totalEggs))/nrow(tmp)) #Prop. of eggs developed adjusted by the # of individuals with fitness W
+  tmp$w3 <- tmp$W3/sum(tmp$W3_bar)
+  tmp$i3 <- ((tmp$totalEggs/mean(tmp$totalEggs))/nrow(tmp)) * ((tmp$w3 - 1)^2)
+  
+  I_3 <- sum(tmp$i3) * nrow(tmp)/(nrow(tmp) - 1)
+
+  I_12 <- var(tmp$totalEggs)/(mean(tmp$totalEggs)^2)
+  
+  #Total selection
+  I <- var(tmp$NumDeveloped)/(mean(tmp$NumDeveloped)^2)
+
+  I_s <- var(tmp$MatingSuccess)/(mean(tmp$MatingSuccess)^2)
+
+  #Calculating percentages for each selection event
+  I_1per <- (I_1/I)*100
+  I_2per <- (I_2/I)*100
+  I_3per <- (I_3/I)*100
+  I_12per <- (I_12/I)*100
+  Iper <- (I/I)*100
+  
+  #Combining all of the selection values (Is) and saving the output
+  trial_num <- as.numeric(gsub("^(C)(\\d)", "\\2",
+                               trial))
+  selection <- cbind(trial_num, I_1, I_1per, I_2, I_2per, I_3, I_3per,
+                     I_12, I_12per, I, Iper, I_s)
+  
+  opp_selection_episodes_mal <- rbind(opp_selection_episodes_mal, selection)
+  
+  #Save the intermediate values
+  mal_succ_fitness <- rbind(mal_succ_fitness, tmp)
+}
+
+#Exporting the data
+#write.csv(mal_succ_fitness, "data/scovelli_int_I_mal.csv", row.names = FALSE)
+```
+
+```{r sum-selection-coef, eval=FALSE, include=FALSE}
+#Merge the selection coefficients from males and females into one dataset to 
+#make life easier
+opp_selection_episodes_fem$Sex <- "F"
+opp_selection_episodes_mal$Sex <- "M"
+
+opp_selection_episodes_all <- rbind(opp_selection_episodes_fem, opp_selection_episodes_mal)
+
+#Exporting the data
+#write.csv(opp_selection_episodes_all, "data/scovelli_opp_selection.csv", row.names = FALSE)
+
+#Calculating the mean and Confidence intervals for each episode of selection
+#For males and females
+t_test <- qt(p = 0.975, df = (nrow(opp_selection_episodes_mal) - 1))
+
+seI1 <- tapply(opp_selection_episodes_all$I_1, opp_selection_episodes_all$Sex, function(x){
+  sqrt(var(x))/sqrt(length(x))
+})
+meanI1 <- tapply(opp_selection_episodes_all$I_1, opp_selection_episodes_all$Sex, mean)
+meanI1 - seI1*t_test
+
+seI2 <- tapply(opp_selection_episodes_all$I_2, opp_selection_episodes_all$Sex, function(x){
+  sqrt(var(x))/sqrt(length(x))
+})
+meanI2 <- tapply(opp_selection_episodes_all$I_2, opp_selection_episodes_all$Sex, mean)
+meanI2 + seI2*t_test
+
+seI3 <- tapply(opp_selection_episodes_all$I_3, opp_selection_episodes_all$Sex, function(x){
+  sqrt(var(x))/sqrt(length(x))
+})
+meanI3 <- tapply(opp_selection_episodes_all$I_3, opp_selection_episodes_all$Sex, mean)
+meanI3 - seI3*t_test
+
+seI12 <- tapply(opp_selection_episodes_all$I_12, opp_selection_episodes_all$Sex, function(x){
+  sqrt(var(x))/sqrt(length(x))
+})
+meanI12 <- tapply(opp_selection_episodes_all$I_12, opp_selection_episodes_all$Sex, mean)
+meanI12 + seI12*t_test
+
+seI <- tapply(opp_selection_episodes_all$I, opp_selection_episodes_all$Sex, function(x){
+  sqrt(var(x))/sqrt(length(x))
+})
+meanI <- tapply(opp_selection_episodes_all$I, opp_selection_episodes_all$Sex, mean)
+meanI - seI*t_test
+
+```
+
+
+## Decomposition of selection differentials (s)
+```{r selection-diff-females}
+#Create a dataframe to store all of the intermediate values of fitness in
+fem_succ_select_diff <- data.frame(matrix(ncol = ncol(fem_succ) + 6,
+                                          nrow = 0))
+colnames(fem_succ_select_diff) <- c(colnames(fem_succ),
+                                    "fit1", "eggs_per_mate","fit2", "prop_dev", "fit3", "StdLength")
+
+#Create a dataframe to store the final calculations of I in
+select_diff_fem <- data.frame(matrix(ncol = 11,
+                                            nrow = 0))
+colnames(select_diff_fem) <- c("trial", "s1", "s2", "s3", "s12", "s123",
+                               "s1_prime", "s2_prime", "s3_prime", "s12_prime", "s123_prime")
+
+for (trial in unique(fem_succ$trial_num)) {
+  
+  #Subset the overall dataframe to work with an individual trial
+  tmp <- fem_succ[fem_succ$trial_num == trial, ]
+  
+  #Calculate fitness relating to pre-cop. selection (#matings)
+  tmp$fit1 <- tmp$MatingSuccess/mean(tmp$MatingSuccess) #Relative mating success
+
+  #Calculate fitness relating to post-mating selection (#eggs transferred)
+  tmp$eggs_per_mate <- tmp$totalEggs/tmp$MatingSuccess
+  tmp$fit2 <- ifelse(tmp$MatingSuccess > 0,
+                     tmp$eggs_per_mate/mean(tmp$eggs_per_mate, na.rm = TRUE),
+                     0) #Relative eggs transferred
+
+  #Calculate fitness relating to post-mating selection (eggs that developed)
+  tmp$prop_dev <- (tmp$NumDeveloped/tmp$MatingSuccess)/tmp$eggs_per_mate
+  tmp$fit3 <- ifelse(tmp$MatingSuccess > 0,
+                     tmp$prop_dev/mean(tmp$prop_dev, na.rm = TRUE),
+                     0)
+  
+  #Standardizing the trait value to have a mean of 0 and sd of unity
+  tmp$StdLength <- (tmp$length - mean(tmp$length))/sd(tmp$length)
+  
+  #Calculating the absolute selection differentials (s)
+  s1 <- cov(tmp$length, tmp$fit1)
+  s12 <- cov(tmp$length, tmp$fit2)
+  s123 <- cov(tmp$length, tmp$fit3)
+  s2 <- s12 - s1
+  s3 <- s123 - s12
+  
+  #Calculating the standardized selection differentials (s')
+  s1_prime <- cov(tmp$StdLength, tmp$fit1)
+  s12_prime <- cov(tmp$StdLength, tmp$fit2)
+  s123_prime <- cov(tmp$StdLength, tmp$fit3)
+  s2_prime <- s12_prime - s1_prime
+  s3_prime <- s123_prime - s12_prime
+  
+  #Combining all of the selection differentials (s, s') and saving the output
+  trial_num <- as.numeric(gsub("^(C)(\\d)", "\\2",
+                               trial))
+  selection <- cbind(trial_num, s1, s2, s3, s12, s123, 
+                     s1_prime, s2_prime, s3_prime, s12_prime, s123_prime)
+  
+  select_diff_fem <- rbind(select_diff_fem, selection)
+  
+  #Save the intermediate values
+  fem_succ_select_diff <- rbind(fem_succ_select_diff, tmp)
+}
+
+#Exporting the data
+#write.csv(fem_succ_select_diff, "data/scovelli_int_diff_fem.csv", row.names = FALSE)
+```
+
+```{r selection-diff-males}
+#Create a dataframe to store all of the intermediate values of fitness in
+mal_succ_select_diff <- data.frame(matrix(ncol = ncol(mal_succ) + 6,
+                                          nrow = 0))
+colnames(mal_succ_select_diff) <- c(colnames(mal_succ),
+                                    "fit1", "eggs_per_mate","fit2", "prop_dev", "fit3", "StdLength")
+
+#Create a dataframe to store the final calculations of I in
+select_diff_mal <- data.frame(matrix(ncol = 11,
+                                            nrow = 0))
+colnames(select_diff_mal) <- c("trial", "s1", "s2", "s3", "s12", "s123",
+                               "s1_prime", "s2_prime", "s3_prime", "s12_prime", "s123_prime")
+
+for (trial in unique(mal_succ$trial_num)) {
+  
+  #Subset the overall dataframe to work with an individual trial
+  tmp <- mal_succ[mal_succ$trial_num == trial, ]
+  
+  #Calculate fitness relating to pre-cop. selection (#matings)
+  tmp$fit1 <- tmp$MatingSuccess/mean(tmp$MatingSuccess) #Relative mating success
+
+  #Calculate fitness relating to post-mating selection (#eggs transferred)
+  tmp$eggs_per_mate <- tmp$totalEggs/tmp$MatingSuccess
+  tmp$fit2 <- ifelse(tmp$MatingSuccess > 0,
+                     tmp$eggs_per_mate/mean(tmp$eggs_per_mate, na.rm = TRUE),
+                     0) #Relative eggs transferred
+
+  #Calculate fitness relating to post-mating selection (eggs that developed)
+  tmp$prop_dev <- (tmp$NumDeveloped/tmp$MatingSuccess)/tmp$eggs_per_mate
+  tmp$fit3 <- ifelse(tmp$MatingSuccess > 0,
+                     tmp$prop_dev/mean(tmp$prop_dev, na.rm = TRUE),
+                     0)
+  
+  #Standardizing the trait value to have a mean of 0 and sd of unity
+  tmp$StdLength <- (tmp$length - mean(tmp$length))/sd(tmp$length)
+  
+  #Calculating the absolute selection differentials (s)
+  s1 <- cov(tmp$length, tmp$fit1)
+  s12 <- cov(tmp$length, tmp$fit2)
+  s123 <- cov(tmp$length, tmp$fit3)
+  s2 <- s12 - s1
+  s3 <- s123 - s12
+  
+  #Calculating the standardized selection differentials (s')
+  s1_prime <- cov(tmp$StdLength, tmp$fit1)
+  s12_prime <- cov(tmp$StdLength, tmp$fit2)
+  s123_prime <- cov(tmp$StdLength, tmp$fit3)
+  s2_prime <- s12_prime - s1_prime
+  s3_prime <- s123_prime - s12_prime
+  
+  #Combining all of the selection differentials (s, s') and saving the output
+  trial_num <- as.numeric(gsub("^(C)(\\d)", "\\2",
+                               trial))
+  selection <- cbind(trial_num, s1, s2, s3, s12, s123, 
+                     s1_prime, s2_prime, s3_prime, s12_prime, s123_prime)
+  
+  select_diff_mal <- rbind(select_diff_mal, selection)
+  
+  #Save the intermediate values
+  mal_succ_select_diff <- rbind(mal_succ_select_diff, tmp)
+}
+
+#Exporting the data
+#write.csv(mal_succ_select_diff, "data/scovelli_int_diff_mal.csv", row.names = FALSE)
+```
+
+```{r selection-diff-sum, eval=FALSE, include=FALSE}
+#Merge the male and female datasets together
+select_diff_fem$Sex <- "F"
+select_diff_mal$Sex <- "M"
+
+select_diff_all <- rbind(select_diff_fem, select_diff_mal)
+
+#Exporting the data
+#write.csv(select_diff_all, "data/scovelli_select_diff.csv", row.names = FALSE)
+
+#Confidence intervals - absolute selection differentials
+t_test <- qt(p = 0.975, df = (nrow(select_diff_mal) - 1))
+
+se_s1 <- tapply(select_diff_all$s1, select_diff_all$Sex, function(x){
+  sqrt(var(x))/sqrt(length(x))
+})
+mean_s1 <- tapply(select_diff_all$s1, select_diff_all$Sex, mean)
+mean_s1 + se_s1*t_test
+
+se_s2 <- tapply(select_diff_all$s2, select_diff_all$Sex, function(x){
+  sqrt(var(x))/sqrt(length(x))
+})
+mean_s2 <- tapply(select_diff_all$s2, select_diff_all$Sex, mean)
+mean_s2 + se_s2*t_test
+
+se_s3 <- tapply(select_diff_all$s3, select_diff_all$Sex, function(x){
+  sqrt(var(x))/sqrt(length(x))
+})
+mean_s3 <- tapply(select_diff_all$s3, select_diff_all$Sex, mean)
+mean_s3 - se_s3*t_test
+
+se_s123 <- tapply(select_diff_all$s123, select_diff_all$Sex, function(x){
+  sqrt(var(x))/sqrt(length(x))
+})
+mean_s123 <- tapply(select_diff_all$s123, select_diff_all$Sex, mean)
+mean_s123 + se_s123*t_test
+
+#Confidence intervals - standardized selection differentials
+se_s1_prime <- tapply(select_diff_all$s1_prime, select_diff_all$Sex, function(x){
+  sqrt(var(x))/sqrt(length(x))
+})
+mean_s1_prime <- tapply(select_diff_all$s1_prime, select_diff_all$Sex, mean)
+mean_s1_prime + se_s1_prime*t_test
+
+se_s2_prime <- tapply(select_diff_all$s2_prime, select_diff_all$Sex, function(x){
+  sqrt(var(x))/sqrt(length(x))
+})
+mean_s2_prime <- tapply(select_diff_all$s2_prime, select_diff_all$Sex, mean)
+mean_s2_prime + se_s2_prime*t_test
+
+se_s3_prime <- tapply(select_diff_all$s3_prime, select_diff_all$Sex, function(x){
+  sqrt(var(x))/sqrt(length(x))
+})
+mean_s3_prime <- tapply(select_diff_all$s3_prime, select_diff_all$Sex, mean)
+mean_s3_prime + se_s3_prime*t_test
+
+se_s123_prime <- tapply(select_diff_all$s123_prime, select_diff_all$Sex, function(x){
+  sqrt(var(x))/sqrt(length(x))
+})
+mean_s123_prime <- tapply(select_diff_all$s123_prime, select_diff_all$Sex, mean)
+mean_s123_prime + se_s123_prime*t_test
+```
+
+# Mate success versus Reproductive success (Bateman Gradient)
+I now want to look at any relationship that may exist between mating success and reproductive success for males and females. The Bateman gradient will be calculated, which is the slope of the weighted least-squares regression of relative reproductive success (number of offspring divided by the mean) on mating success.
+
+```{r bateman, echo=FALSE, fig.cap="Relationship between reproductive success and mating success for male (purple) and female (green) _Syngnathus floridae_. Reproductive success is shown as relative fitness (i.e. number of offspring produced divided by the mean number of offspring produced). Bateman's gradient is shown as the weighted least-squares regression line (dashed) for males and females.", fig.height=5}
+#Calculating relative fitness as a metric for reproductive success
+#Create a dataframe to store all of the calculations of relative fitness in
+fem_bateman <- data.frame(matrix(ncol = 3,
+                                 nrow = 0))
+colnames(fem_bateman) <- c("trial", "MatingSuccess","rel_repo_fitness")
+
+#Loop through each trial to calculate relative fitness
+for (trial in unique(fem_succ$trial_num)) {
+  
+  #Subset the overall dataframe to work with an individual trial
+  tmp <- fem_succ[fem_succ$trial_num == trial, ]
+  
+  #Calculate relative fitness
+  rel_repo_fitness <- tmp$totalEggs/mean(tmp$totalEggs)
+  
+  #Column-bind the trial #, Mating success, and calculated rel. fitness
+  fitness <- cbind("trial" = rep(trial, nrow(tmp)), 
+                   "MatingSuccess" = tmp$MatingSuccess, 
+                   rel_repo_fitness)
+  
+  #Add this chunk of data to the dataframe we created
+  fem_bateman <- rbind(fem_bateman, fitness)
+}
+
+#Repeat process for the Male mating data
+mal_bateman <- data.frame(matrix(ncol = 3,
+                                 nrow = 0))
+colnames(mal_bateman) <- c("trial", "MatingSuccess","rel_repo_fitness")
+
+for (trial in unique(mal_succ$trial_num)) {
+  
+  #Subset the overall dataframe to work with an individual trial
+  tmp <- mal_succ[mal_succ$trial_num == trial, ]
+  
+  #Calculate relative fitness
+  rel_repo_fitness <- tmp$totalEggs/mean(tmp$totalEggs)
+  
+  #Column-bind the trial #, Mating success, and calculated rel. fitness
+  fitness <- cbind("trial" = rep(trial, nrow(tmp)), 
+                   "MatingSuccess" = tmp$MatingSuccess, 
+                   rel_repo_fitness)
+  
+  #Add this chunk of data to the dataframe we created
+  mal_bateman <- rbind(mal_bateman, fitness)
+}
+
+
+#Generating Bateman's gradient
+#Define the model
+fem_model <- lm(fem_bateman$rel_repo_fitness ~ fem_bateman$MatingSuccess)
+mal_model <- lm(mal_bateman$rel_repo_fitness ~ mal_bateman$MatingSuccess)
+
+#define weights to use
+wt_fem <- 1 / lm(abs(fem_model$residuals) ~ fem_model$fitted.values)$fitted.values^2
+wt_mal <- 1 / lm(abs(mal_model$residuals) ~ mal_model$fitted.values)$fitted.values^2
+
+#perform weighted least squares regression
+wls_model_fem <- lm(fem_bateman$rel_repo_fitness ~ fem_bateman$MatingSuccess,
+                    weights=wt_fem)
+wls_model_mal <- lm(mal_bateman$rel_repo_fitness ~ mal_bateman$MatingSuccess,
+                    weights=wt_mal)
+
+#Running a weighted least squares regression between MS and Sex
+all_sex_succ <- read.csv("data/all_succ_matings.csv", header = TRUE)
+MS_sex_model <- lm(all_sex_succ$relative_fit ~
+                     all_sex_succ$MatingSuccess*all_sex_succ$sex)
+
+wt_all <- 1 / lm(abs(MS_sex_model$residuals) ~
+                   MS_sex_model$fitted.values)$fitted.values^2
+
+wls_MS_sex_model <- lm(all_sex_succ$relative_fit ~ all_sex_succ$MatingSuccess*all_sex_succ$sex, weights = wt_all)
+  
+#Plotting the relationship between the mating and reproductive success
+par(mfrow=c(1,1))
+plot(fem_bateman$MatingSuccess,
+     fem_bateman$rel_repo_fitness,
+     xlab = "Number of Mates (mating success)",
+     ylab = "Relative Fitness (reproductive success)",
+     pch = 19,
+     col = "#7fc97f75")
+points(mal_bateman$MatingSuccess,
+       mal_bateman$rel_repo_fitness,
+       xlab = "Number of Mates (mating success)",
+       ylab = "Relative Fitness (reproductive success)",
+       pch = 19,
+       col = "#beaed475")
+abline(wls_model_fem, col = "#7fc97f", lwd = 3, lty = 2)
+abline(wls_model_mal, col = "#beaed4", lwd = 3, lty = 2)
+
+```
+
+```{r sum-bateman}
+summary(wls_model_fem)
+summary(wls_model_mal)
+```
+
+## Omitting females with high mating
+To make sure the two females that mated 3 times are not significantly affect the Bateman gradient I am re-plotting and re-running the model with those points omitted.
+
+```{r bateman-no3, echo=FALSE}
+#Plotting the relationship between the mating and reproductive success without the two females who mated 3 times
+par(mfrow=c(1,1))
+plot(fem_bateman$MatingSuccess[fem_bateman$MatingSuccess < 2],
+     fem_bateman$rel_repo_fitness[fem_bateman$MatingSuccess < 2],
+     xlab = "Number of Mates (mating success)",
+     ylab = "Relative Fitness (reproductive success)",
+     pch = 19,
+     col = "#7fc97f75")
+points(mal_bateman$MatingSuccess,
+       mal_bateman$rel_repo_fitness,
+       xlab = "Number of Mates (mating success)",
+       ylab = "Relative Fitness (reproductive success)",
+       pch = 19,
+       col = "#beaed475")
+
+#Redefine the female model
+fem_model2 <- lm(fem_bateman$rel_repo_fitness[fem_bateman$MatingSuccess < 2] ~
+                   fem_bateman$MatingSuccess[fem_bateman$MatingSuccess < 2])
+wt_fem2 <- 1 / lm(abs(fem_model2$residuals) ~
+                    fem_model2$fitted.values)$fitted.values^2
+wls_model_fem2 <- lm(fem_bateman$rel_repo_fitness[fem_bateman$MatingSuccess < 2] ~
+                       fem_bateman$MatingSuccess[fem_bateman$MatingSuccess < 2],
+                     weights=wt_fem2)
+
+abline(wls_model_fem2, col = "#7fc97f", lwd = 3, lty = 2)
+abline(wls_model_mal, col = "#beaed4", lwd = 3, lty = 2)
+
+summary(wls_model_fem2)
+```
+
+It doesn't look like omitting those few individuals has any effect on the results of the Bateman gradient.
+
+# Visualizing post-copulatory selection
+As a way to visualize selection acting AFTER the mating event (post-copulatory selection) I am plotting the proportion of eggs that survived against mating success. Hopefully this will tell us if acquiring more mates is having any affect on the ability for the eggs to develop.
+
+```{r surv-v-matings, echo=FALSE, fig.cap="Plotting the relationship between the proportion of eggs that developed and the number of mates aquired for both males (purple) and females (green). This was done omitting the individuals that did not mate (left) and including those individuals (right).", fig.height=5}
+mal_succ$prop_surviving <- ifelse(mal_succ$totalEggs == 0, 0,
+                                  mal_succ$NumDeveloped_Calc/mal_succ$totalEggs)
+fem_succ$prop_surviving <- ifelse(fem_succ$totalEggs == 0, 0,
+                                  fem_succ$NumDeveloped/fem_succ$totalEggs)
+par(mfrow=c(1,2))
+plot(fem_succ$MatingSuccess[fem_succ$totalEggs != 0],
+     fem_succ$prop_surviving[fem_succ$totalEggs != 0],
+     xlab = "Number of Mates (mating success)",
+     ylab = "Proportion of Surviving Offpring",
+     pch = 19,
+     col = "#7fc97f75")
+points(mal_succ$MatingSuccess[mal_succ$totalEggs != 0],
+       mal_succ$prop_surviving[mal_succ$totalEggs != 0],
+       xlab = "Number of Mates (mating success)",
+       ylab = "Proportion of Surviving Offpring",
+       pch = 19,
+       col = "#beaed475")
+abline(lm(fem_succ$prop_surviving[fem_succ$totalEggs != 0] ~
+            fem_succ$MatingSuccess[fem_succ$totalEggs != 0]),
+       col = "#7fc97f", lwd = 3, lty = 2)
+abline(lm(mal_succ$prop_surviving[mal_succ$totalEggs != 0] ~
+            mal_succ$MatingSuccess[mal_succ$totalEggs != 0]),
+       col = "#beaed4", lwd = 3, lty = 2)
+
+
+plot(fem_succ$MatingSuccess,
+     fem_succ$prop_surviving,
+     xlab = "Number of Mates (mating success)",
+     ylab = "Proportion of Surviving Offpring",
+     pch = 19,
+     col = "#7fc97f75")
+points(mal_succ$MatingSuccess,
+       mal_succ$prop_surviving,
+       xlab = "Number of Mates (mating success)",
+       ylab = "Proportion of Surviving Offpring",
+       pch = 19,
+       col = "#beaed475")
+abline(lm(fem_succ$prop_surviving ~
+            fem_succ$MatingSuccess),
+       col = "#7fc97f", lwd = 3, lty = 2)
+abline(lm(mal_succ$prop_surviving ~
+            mal_succ$MatingSuccess),
+       col = "#beaed4", lwd = 3, lty = 2)
+```
+
+# Mate success versus Reproductive success (Bateman Gradient)
+I now want to look at any relationship that may exist between mating success and reproductive success for males and females. The Bateman gradient will be calculated, which is the slope of the weighted least-squares regression of relative reproductive success (number of offspring divided by the mean) on mating success.
+
+```{r bateman, echo=FALSE, fig.cap="Relationship between reproductive success and mating success for male (purple) and female (green) _Syngnathus floridae_. Reproductive success is shown as relative fitness (i.e. number of offspring produced divided by the mean number of offspring produced). Bateman's gradient is shown as the weighted least-squares regression line (dashed) for males and females.", fig.height=5}
+#Calculating relative fitness as a metric for reproductive success
+#Create a dataframe to store all of the calculations of relative fitness in
+fem_bateman <- data.frame(matrix(ncol = 3,
+                                 nrow = 0))
+colnames(fem_bateman) <- c("trial", "MatingSuccess","rel_repo_fitness")
+
+#Loop through each trial to calculate relative fitness
+for (trial in unique(fem_succ$trial_num)) {
+  
+  #Subset the overall dataframe to work with an individual trial
+  tmp <- fem_succ[fem_succ$trial_num == trial, ]
+  
+  #Calculate relative fitness
+  rel_repo_fitness <- tmp$totalEggs/mean(tmp$totalEggs)
+  
+  #Calculte mating fitness
+  rel_mate_succuess <- tmp$MatingSuccess/mean(tmp$MatingSuccess)
+  
+  #Column-bind the trial #, Mating success, and calculated rel. fitness
+  fitness <- cbind("trial" = rep(trial, nrow(tmp)), 
+                   "MatingSuccess" = rel_mate_succuess, 
+                   rel_repo_fitness)
+  
+  #Add this chunk of data to the dataframe we created
+  fem_bateman <- rbind(fem_bateman, fitness)
+}
+
+#Repeat process for the Male mating data
+mal_bateman <- data.frame(matrix(ncol = 3,
+                                 nrow = 0))
+colnames(mal_bateman) <- c("trial", "MatingSuccess","rel_repo_fitness")
+
+for (trial in unique(mal_succ$trial_num)) {
+  
+  #Subset the overall dataframe to work with an individual trial
+  tmp <- mal_succ[mal_succ$trial_num == trial, ]
+  
+  #Calculate relative fitness
+  rel_repo_fitness <- tmp$totalEggs/mean(tmp$totalEggs)
+  
+  #Calculte mating fitness
+  rel_mate_succuess <- tmp$MatingSuccess/mean(tmp$MatingSuccess)
+  
+  #Column-bind the trial #, Mating success, and calculated rel. fitness
+  fitness <- cbind("trial" = rep(trial, nrow(tmp)), 
+                   "MatingSuccess" = rel_mate_succuess, 
+                   rel_repo_fitness)
+  
+  #Add this chunk of data to the dataframe we created
+  mal_bateman <- rbind(mal_bateman, fitness)
+}
+
+
+#Generating Bateman's gradient
+#Define the model
+fem_model <- lm(fem_bateman$rel_repo_fitness ~ fem_bateman$MatingSuccess)
+mal_model <- lm(mal_bateman$rel_repo_fitness ~ mal_bateman$MatingSuccess)
+
+#define weights to use
+wt_fem <- 1 / lm(abs(fem_model$residuals) ~ fem_model$fitted.values)$fitted.values^2
+wt_mal <- 1 / lm(abs(mal_model$residuals) ~ mal_model$fitted.values)$fitted.values^2
+
+#perform weighted least squares regression
+wls_model_fem <- lm(fem_bateman$rel_repo_fitness ~ fem_bateman$MatingSuccess,
+                    weights=wt_fem)
+wls_model_mal <- lm(mal_bateman$rel_repo_fitness ~ mal_bateman$MatingSuccess,
+                    weights=wt_mal)
+
+#Running a weighted least squares regression between MS and Sex
+all_sex_succ <- read.csv("data/all_succ_matings.csv", header = TRUE)
+MS_sex_model <- lm(all_sex_succ$relative_fit ~
+                     all_sex_succ$MatingSuccess*all_sex_succ$sex)
+
+wt_all <- 1 / lm(abs(MS_sex_model$residuals) ~
+                   MS_sex_model$fitted.values)$fitted.values^2
+
+wls_MS_sex_model <- lm(all_sex_succ$relative_fit ~ all_sex_succ$MatingSuccess*all_sex_succ$sex, weights = wt_all)
+  
+#Plotting the relationship between the mating and reproductive success
+par(mfrow=c(1,1))
+plot(fem_bateman$MatingSuccess,
+     fem_bateman$rel_repo_fitness,
+     xlab = "Number of Mates (mating success)",
+     ylab = "Relative Fitness (reproductive success)",
+     pch = 19,
+     col = "#7fc97f75")
+points(mal_bateman$MatingSuccess,
+       mal_bateman$rel_repo_fitness,
+       xlab = "Number of Mates (mating success)",
+       ylab = "Relative Fitness (reproductive success)",
+       pch = 19,
+       col = "#beaed475")
+abline(wls_model_fem, col = "#7fc97f", lwd = 3, lty = 2)
+abline(wls_model_mal, col = "#beaed4", lwd = 3, lty = 2)
+
+write.csv(fem_bateman, file = "data/SS_fem_bateman.csv", row.names = FALSE)
+write.csv(mal_bateman, file = "data/SS_mal_bateman.csv", row.names = FALSE)
+```
+
+```{r sum-bateman}
+summary(wls_model_fem)
+summary(wls_model_mal)
+```
