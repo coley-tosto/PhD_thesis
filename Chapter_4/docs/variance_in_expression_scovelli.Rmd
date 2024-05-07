@@ -1,6 +1,6 @@
 ---
 title: 'Expression variance: Syngnathus scovelli'
-author: "Sarah P. Flanagan"
+author: "Coley Tosto"
 date: "2023-10-10"
 output: html_document
 editor_options: 
@@ -286,6 +286,101 @@ for(i in 2:4){
                     ifelse(tmp$log2FoldChange < -2 & tmp$padj < 0.05,
                            "#7fc97f75",
                            "#A9A9A975")),#colors[txpt_sum_stats$SexBiased],
+       cex = 0.5,
+       pch = 19)
+  
+  axis(1,
+       lwd = 2,cex = 2, cex.axis=1.5, las=1)
+  axis(2,
+       lwd=2,cex=2, cex.axis=1.5, las=1)
+  
+  mtext(tissue, cex=1.5,outer=FALSE, line=-1)
+  
+  # add bar in female direction
+  arrows(x0 = tmp[,grep("Fem_LSEM", out_cols,value=TRUE)],
+         y0 = tmp[,grep("Mal_Mean", out_cols,value=TRUE)],
+         x1 = tmp[,grep("Fem_USEM", out_cols,value=TRUE)],
+         y1 = tmp[,grep("Mal_Mean", out_cols,value=TRUE)],
+         length=0,
+         col=ifelse(tmp$log2FoldChange > 2 & tmp$padj < 0.05,
+                    "#beaed450",
+                    ifelse(tmp$log2FoldChange < -2 & tmp$padj < 0.05,
+                           "#7fc97f50",
+                           "#A9A9A950")))
+  
+  # add bar in male direction
+  arrows(y0 = tmp[,grep("Mal_LSEM", out_cols,value=TRUE)],
+         x0 = tmp[,grep("Fem_Mean", out_cols,value=TRUE)],
+         y1 = tmp[,grep("Mal_USEM", out_cols,value=TRUE)],
+         x1 = tmp[,grep("Fem_Mean", out_cols,value=TRUE)],
+         length=0,
+         col=ifelse(tmp$log2FoldChange > 2 & tmp$padj < 0.05,
+                    "#beaed450",
+                    ifelse(tmp$log2FoldChange < -2 & tmp$padj < 0.05,
+                           "#7fc97f50",
+                           "#A9A9A950")))
+  
+}
+
+
+# add x axis label
+mtext("log(Female gene counts)",side = 1,cex=1.5, outer=TRUE, line=2)
+
+# add y axis label
+mtext("log(Male gene counts)",side = 2,cex=1.5, outer=TRUE, line=2.25)
+
+# add legend
+spfTools::outer_legend("right",
+                       legend=c("Female\nbiased",
+                                "Male\nbiased",
+                                "Unbiased"),
+                       pt.bg=c("#7fc97f", "#beaed4", "#A9A9A9"),
+                       pch=22,
+                       bty='n',
+                       ncol=1,
+                       cex=2,
+                       y.intersp = 1.5,
+                       pt.cex=2)
+
+
+dev.off()
+
+```
+
+```{r varFig, fig.keep='last', fig.height=5, fig.width=7.5}
+pdf("docs/figs/Fig_var_expression_all.pdf", width = 10, height=4)
+
+par(mfrow=c(1,4), 
+    oma=c(4,4,2,8), 
+    mar=c(1,1,1,0))
+
+for(i in 1:4){
+  
+  tissue <- organs[i]
+  #Pull out the columns corresponding to this tissue specifically
+  out_cols <- grep(substring(tissue, 1, 3),
+                   colnames(txpt_sum_stats), 
+                   value=TRUE)
+  
+  tmp <- txpt_sum_stats[, out_cols]
+  
+  
+  #Merge the mean and CI data with logFC data
+  tmp <- merge(SBG_list[[i]], tmp, by = "row.names", all.x = TRUE)
+
+  
+  plot(tmp[, grep("Fem_Mean", out_cols, value=TRUE)],
+       tmp[, grep("Mal_Mean", out_cols, value=TRUE)],
+       xlim = c(0, 15),
+       ylim = c(0, 15),
+       axes = FALSE,
+       bty = 'n',
+       cex.main = 2,
+       col = ifelse(tmp$log2FoldChange > 2 & tmp$padj < 0.05,
+                    "#beaed475",
+                    ifelse(tmp$log2FoldChange < -2 & tmp$padj < 0.05,
+                           "#7fc97f75",
+                           "#A9A9A975")),
        cex = 0.5,
        pch = 19)
   

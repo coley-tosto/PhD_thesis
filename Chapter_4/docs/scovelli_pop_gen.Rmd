@@ -159,24 +159,24 @@ logFC_TD <- merge(logFC, tajD[,2:14], by.x = "geneID", by.y = "Chr", all.x = TRU
 logFC_TD <- logFC_TD[!(is.na(logFC_TD$Tajima)),]
 
 #Remove all of the sex-specific genes from the dataset (Only interested in sex-biased)
-logFC_TD <- logFC_TD[logFC_TD$bias_cat != "Sex-specific", ]
+#logFC_TD <- logFC_TD[logFC_TD$bias_cat != "Sex-specific", ]
 
 #Remove the brain from the dataset
 logFC_TD <- logFC_TD[logFC_TD$tissue != "Brain", ]
 
 #Export this merged dataset to use for making figures
-#write.csv(logFC_TD, "data/sexbias_tajD.csv", row.names = FALSE)
+#write.csv(logFC_TD, "data/bias_cats_tajD.csv", row.names = FALSE)
 
 #See how many data points we have for each bias category
 tapply(logFC_TD$Tajima[logFC_TD$tissue == "Gonad"], 
        logFC_TD$bias[logFC_TD$tissue == "Gonad"], 
-       length)
+       mean)
 tapply(logFC_TD$Tajima[logFC_TD$tissue == "Liver"], 
        logFC_TD$bias[logFC_TD$tissue == "Liver"], 
-       length)
+       mean)
 tapply(logFC_TD$Tajima[logFC_TD$tissue == "Skin"], 
        logFC_TD$bias[logFC_TD$tissue == "Skin"], 
-       length)
+       mean)
 ```
 
 From the above numbers it looks like we will really only have enough data in the gonads to get an idea about what relationship may occur between sex-biased gene expression and Tajima's D. The other organs just don't have enough points in the biased categories.

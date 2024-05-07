@@ -30,7 +30,7 @@ library(knitr)
 ```{r setParams, eval=TRUE}
 sex_bias_colors <- c("FB" = "#7fc97f", "MB" = "#beaed4", "UB" = "darkgray")
 
-biased_bins <- c("Low", "Med", "High", "Extreme", "Sex.specific")
+biased_bins <- c("Low", "Med", "High", "Extreme", "Sex-specific")
 labs <- c("Low", "Med", "High", "Extreme", "Specific")
 
 sex_cols <- c("F" = "#7fc97f", "M" = "#beaed4" )
@@ -949,11 +949,17 @@ dev.off()
 ```{r figTajDdata}
 #Read in the data that contains info about Tajima's D and Sex bias
 logFC_TD <- read.csv("plot_data/sexbias_tajD.csv")
+logFC_TD_SS <- read.csv("plot_data/bias_cats_tajD.csv")
 
 #Make sure the Bias cats. plot in the correct order
 logFC_TD$bias <- factor(logFC_TD$bias, 
                         levels = c("FB", "NB", "MB"), 
                         ordered = TRUE)
+logFC_TD_SS$bias <- factor(logFC_TD_SS$bias, 
+                        levels = c("FB", "NB", "MB"), 
+                        ordered = TRUE)
+logFC_TD_SS$bias_cat <- factor(logFC_TD_SS$bias_cat,
+                               levels = bias_bins, ordered = TRUE)
 
 #Set the max and min y-axis value based on the TD so they are all on the same scale
 ymax <- max(logFC_TD$Tajima)+0.5
@@ -967,6 +973,48 @@ sex_bias_colors <- c("FB" = "#7fc97f", "NB" = "darkgray", "MB" = "#beaed4")
 
 ```
 
+### Tajima's D across bias cats - gonads
+
+```{r figtauvSB-SBG}
+pdf("figs/Fig_TDvcat.pdf",width = 10, height=6)
+
+par(oma=c(2,2,1,2),
+    mar=c(2,2,1,2),
+    xpd=FALSE)
+
+ ggplot(logFC_TD_SS[logFC_TD_SS$tissue == "Gonad",], 
+        aes(x = bias_cat, y = Tajima, fill = bias)) +
+  geom_violin(position = position_dodge(), draw_quantiles = c(0.5)) +
+  scale_x_discrete(labels= bias_labs) +
+  geom_boxplot(width = 0.1, color = "black", 
+               position = position_dodge(width = 0.9)) +
+  scale_fill_manual(values = sex_bias_colors) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        strip.background = element_blank(),
+        axis.line = element_line(colour = "black"),
+        text=element_text(size=16)) +
+  labs(x="Bias Category", y="Tajima's D") +
+  stat_n_text(data = logFC_TD_SS[logFC_TD_SS$bias == "FB" &
+                                   logFC_TD_SS$tissue == "Gonad",], 
+              aes(x=bias_cat, y=Tajima),
+              y.pos = -1.5,
+              color=sex_bias_colors["FB"], size = 3) +
+  stat_n_text(data = logFC_TD_SS[logFC_TD_SS$bias == "MB" &
+                                   logFC_TD_SS$tissue == "Gonad",], 
+              aes(x=bias_cat, y=Tajima),
+              y.pos = 3.75,
+             color=sex_bias_colors["MB"], size = 3) +
+  stat_n_text(data = logFC_TD_SS[logFC_TD_SS$bias == "NB" &
+                                   logFC_TD_SS$tissue == "Gonad",], 
+              aes(x=bias_cat, y=Tajima),
+              y.pos=4,
+              color=sex_bias_colors["NB"], size = 3) +
+  guides(fill = guide_legend(title = "Bias", order = 3))
+
+dev.off()
+```
 
 ### Fig. Tajima's D boxplots
 
