@@ -127,8 +127,8 @@ dds_FU <- DESeqDataSetFromTximport(txi.salmon,
 ##Remove all 11M4 organs from the dataset
 dds_FU <- dds_FU[, !(dds_FU$ID %in% c("FUT11M4", "FUG11M4", "FUL11M4"))]
 
-##Filter the dataset, only keeping rows that have at least 10 reads total, but less than 1,000,000
-keep <- rowSums(counts(dds_FU)) >= 10 & rowSums(counts(dds_FU)) < 1e6
+##Filter the dataset, only keeping rows that have at least 10 reads total
+keep <- rowSums(counts(dds_FU)) >= 10 
 dds_FU <- dds_FU[keep, ]
 
 #Generate the expression values
@@ -700,7 +700,7 @@ dds_FU_exp$Organ <- ifelse(dds_FU_exp$Organ %in% c("Ovaries", "Testis"),
 
 bias_colors <- c("FB" = "#7fc97f", "MB" = "#beaed4", "UB" = "#A9A9A975") 
 
-#pdf("docs/figs/Fig_MFexpression.pdf", width = 10, height=4)
+pdf("docs/figs/Fig_MFexpression.pdf", width = 10, height=4)
 
 par(mfrow=c(1,3), oma=c(4,4,2,8), mar=c(1,1,1,0))
 
@@ -767,7 +767,7 @@ spfTools::outer_legend("right",
                        y.intersp = 1.5,
                        pt.cex=2)
 
-#dev.off()
+dev.off()
 
 ```
 
@@ -981,7 +981,7 @@ organ_cols <- c("Gill" = "#20B2AA",
 
 organs <- levels(logFC_long_all$tissue)
 
-#pdf("docs/figs/Fig_tau_sexbias.pdf", width = 8, height=5)
+pdf("docs/figs/Fig_tau_sexbias.pdf", width = 8, height=5)
 par(oma = c(2,2,1,2),
     mar = c(2,2,1,2),
     xpd = FALSE)
@@ -1033,7 +1033,7 @@ outer_legend("top",
              ncol = 3)
 
 outer_legend("top",
-             c("               ", "            ", ""),
+             c("               ", "            ", "     "),
              col = c("#EEB422", "#EE8262", "#20B2AA"),
              pch = 21,
              pt.bg = c("#EEB42275", "#EE826275", "#20B2AA75"),
@@ -1043,7 +1043,25 @@ outer_legend("top",
 
 mtext("|log fold change|",1,cex=2, line=2)
 mtext(expression(tau["TPM"]),2,cex=2, line=2.5)
-#dev.off()
+dev.off()
+```
+
+```{r figcomb, message=FALSE}
+figtaua <- image_ggplot(image_read_pdf('docs/figs/Fig_tau_biascat_violins.pdf'),interpolate = TRUE)
+figtaub <- image_ggplot(image_read_pdf('docs/figs/Fig_tau_sexbias.pdf'),interpolate = TRUE)
+
+
+figtau<-wrap_plots(
+  figtaub,
+  figtaua,
+  ncol=2
+)
+figtau<-figtau + plot_annotation(tag_levels = 'A')
+figtau
+
+ggsave("docs/figs/FigTau.pdf",figtau,height = 4, width=16)
+ggsave("docs/figs/FigTau.png",figtau,height = 4, width=16)
+
 ```
 
 ```{r}

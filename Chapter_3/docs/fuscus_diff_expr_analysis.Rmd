@@ -590,6 +590,14 @@ ddsMF_FU <- ddsMF_FU[keep, ]
 ddsMF_FU_exp <- DESeq(ddsMF_FU)
 resultsNames(ddsMF_FU_exp)
 
+#Looking at the Normalized read counts for each sample
+cbind(FU_samples[!(FU_samples$ID %in% 
+                     c("FUT11M4", "FUG11M4", "FUL11M4")),],
+      normalizedReads=colSums(counts(ddsMF_FU_exp, 
+                                     normalized=TRUE)
+                              )
+      )
+
 ```
 
 ## Invesitgate the results of the differential expression
@@ -1843,6 +1851,26 @@ ggsave("docs/figs/FigSB.png", figSB, height=8, width=10)
 
 ```
 
+```{r figSB-HM, message=FALSE}
+
+figHMa <- image_ggplot(image_read_pdf('docs/figs/liverMB_heatmap.pdf'),interpolate = TRUE)
+figHMb <- image_ggplot(image_read_pdf('docs/figs/liverFB_heatmap.pdf'),interpolate = TRUE)
+
+figSBHM <- wrap_plots(
+  figSBa,
+  figHMa,
+  figSBb,
+  figHMb,
+  ncol = 2,
+  nrow = 2)
+
+figSBHM <- figSBHM + plot_annotation(tag_levels = 'A')
+figSBHM
+
+ggsave("docs/figs/FigSBHM.pdf", figSBHM, height=8, width=10)
+ggsave("docs/figs/FigSBHM.png", figSBHM, height=8, width=10)
+
+```
 # Gene Ontologogy Analysis and BLASTing the different genes
 There are several things that I want to accomplish with the gene ontology analysis, to start with I want to classify the sex-biased genes and then the sex-specific genes.
 
@@ -2322,7 +2350,7 @@ for(organ in unique(all_go_dat$tissue)){
   all_go_sums <- rbind(all_go_sums, go_sums)
 }
 
-#Change all of the protein classes that have a frequency of less than 0.02 to "Other"
+#Change all of the protein classes that have a frequency of less than 0.01 to "Other"
 for(class in unique(all_go_sums$prot_class)){
   
   #Pull out the rows that contain that protein class
@@ -2371,6 +2399,196 @@ ggplot(all_go_sums,
 
 dev.off()
 
+```
+
+## Looking at GO groups for the male- and female-biased genes
+```{r plot-panther-SBG-liver}
+#Calculate the frequency at which each protein class occurs within the different tissue types
+##Create an empty dataset to store the values in
+all_go_sums_liver <- data.frame(matrix(ncol = 5,
+                                      nrow = 0))
+
+##Add appropriate column names
+colnames(all_go_sums_liver) <- c(colnames(all_go_dat),
+                                "prop")
+
+##Loop through each bias type to calculate frequencies
+for (bias in c("FU_femL_biased_TRgenes_reiro_blast",
+               "FU_malL_biased_TRgenes_reiro_blast")) {
+  
+  tmp <- all_go_dat[all_go_dat$bias_cat == bias, ]
+  
+  #Calculate the respective proportion for each protein class
+  tmp$prop <- tmp$Freq/sum(tmp$Freq)
+  
+  #Export the data to the previously created dataframe
+  all_go_sums_liver <- rbind(tmp, all_go_sums_liver)
+  
+}
 
 
+#Change all of the protein classes that have a frequency of less than 0.01 to "Other"
+for(class in unique(all_go_sums_liver$Var1)){
+  
+  #Pull out the rows that contain that protein class
+  match_rows <- which(all_go_sums_liver$Var1==class)
+  
+  #If any of the proportions associated with those rows is less than 0.01, classify as other
+  if(any(all_go_sums_liver$prop[match_rows]>0.01)==FALSE){
+    
+    all_go_sums_liver$Var1[match_rows] <- " other"
+    
+  }
+}
+
+#Change format of "Unclassified so it will come first"
+all_go_sums_liver$Var1[all_go_sums_liver$Var1=="Unclassified"] <-  " unclassified"
+
+#Generate the GO plot
+bias_col <- c("FU_femL_biased_TRgenes_reiro_blast" = "#7fc97f", 
+               "FU_malL_biased_TRgenes_reiro_blast" = "#beaed4")
+
+
+pdf("docs/figs/FigGO_SBGliver.pdf",height=14, width=12)
+
+ggplot(all_go_sums_liver, 
+       aes(fct_rev(Var1), prop, fill = bias_cat)) +   
+  geom_bar(position = "dodge", stat="identity") +
+  scale_fill_manual(values = bias_col) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black"),
+        axis.text.x = element_text(angle = 90, 
+                                   vjust = 0.5, 
+                                   hjust=1,size=20),
+        axis.text.y = element_text(size=15, hjust = 1,
+                                   vjust = 0.3),
+        text=element_text(size=20),
+        legend.position = "bottom",
+        axis.ticks.length.y = unit(.25, "cm")) +
+  coord_flip() + 
+  labs(y="Proportion of sex-biased genes", x="")
+
+dev.off()
+
+```
+
+```{r plot-panther-SBG-gonads}
+#Calculate the frequency at which each protein class occurs within the different tissue types
+##Create an empty dataset to store the values in
+all_go_sums_gonad <- data.frame(matrix(ncol = 5,
+                                      nrow = 0))
+
+##Add appropriate column names
+colnames(all_go_sums_gonad) <- c(colnames(all_go_dat),
+                                "prop")
+
+##Loop through each bias type to calculate frequencies
+for (bias in c("FU_femGon_biased_TRgenes_reiro_blast",
+               "FU_malGon_biased_TRgenes_reiro_blast")) {
+  
+  tmp <- all_go_dat[all_go_dat$bias_cat == bias, ]
+  
+  #Calculate the respective proportion for each protein class
+  tmp$prop <- tmp$Freq/sum(tmp$Freq)
+  
+  #Export the data to the previously created dataframe
+  all_go_sums_gonad <- rbind(tmp, all_go_sums_gonad)
+  
+}
+
+
+#Change all of the protein classes that have a frequency of less than 0.01 to "Other"
+for(class in unique(all_go_sums_gonad$Var1)){
+  
+  #Pull out the rows that contain that protein class
+  match_rows <- which(all_go_sums_gonad$Var1==class)
+  
+  #If any of the proportions associated with those rows is less than 0.01, classify as other
+  if(any(all_go_sums_gonad$prop[match_rows]>0.01)==FALSE){
+    
+    all_go_sums_gonad$Var1[match_rows] <- " other"
+    
+  }
+}
+
+#Change format of "Unclassified so it will come first"
+all_go_sums_gonad$Var1[all_go_sums_gonad$Var1=="Unclassified"] <-  " unclassified"
+
+#Generate the GO plot
+bias_col <- c("FU_femGon_biased_TRgenes_reiro_blast" = "#7fc97f", 
+               "FU_malGon_biased_TRgenes_reiro_blast" = "#beaed4")
+
+
+pdf("docs/figs/FigGO_SBGgonad.pdf",height=14, width=12)
+
+ggplot(all_go_sums_gonad, 
+       aes(fct_rev(Var1), prop, fill = bias_cat)) +   
+  geom_bar(position = "dodge", stat="identity") +
+  scale_fill_manual(values = bias_col) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black"),
+        axis.text.x = element_text(angle = 90, 
+                                   vjust = 0.5, 
+                                   hjust=1,size=20),
+        axis.text.y = element_text(size=15, hjust = 1,
+                                   vjust = 0.3),
+        text=element_text(size=20),
+        legend.position = "bottom",
+        axis.ticks.length.y = unit(.25, "cm")) +
+  coord_flip() + 
+  labs(y="Proportion of sex-biased genes", x="")
+
+dev.off()
+
+```
+
+```{r}
+#Combine the GO figures
+figGOa <- image_ggplot(image_read_pdf('docs/figs/FigGO_SBGliver.pdf'),
+                        interpolate = TRUE)
+figGOb <- image_ggplot(image_read_pdf('docs/figs/FigGO_SBGgonad.pdf'),
+                           interpolate = TRUE)
+
+# put the patchworks together
+figGO <-  wrap_plots(figGOa, figGOb, ncol=2) + 
+  plot_annotation(tag_levels = 'A') 
+
+ggsave("docs/figs/FigGO_indv.pdf", figGO, height=5, width=8)
+ggsave("docs/figs/FigGO_indv.png", figGO, height=5, width=8)
+```
+
+
+```{r export-danio-geneID-INDV, eval=FALSE}
+
+write.table(blast_output_merged$FU_femGon_biased_TRgenes_reiro_blast$gene_name,
+            'FU_GOnames_SBG_ovary.txt',
+            sep = " ",
+            quote=FALSE,
+            row.names = FALSE,
+            col.names = FALSE)
+
+write.table(blast_output_merged$FU_malGon_biased_TRgenes_reiro_blast$gene_name,
+            'FU_GOnames_SBG_testes.txt',
+            sep = " ",
+            quote=FALSE,
+            row.names = FALSE,
+            col.names = FALSE)
+
+write.table(blast_output_merged$FU_femL_biased_TRgenes_reiro_blast$gene_name,
+            'FU_GOnames_SBG_fLiver.txt',
+            sep = " ",
+            quote=FALSE,
+            row.names = FALSE,
+            col.names = FALSE)
+
+write.table(blast_output_merged$FU_malL_biased_TRgenes_reiro_blast$gene_name,
+            'FU_GOnames_SBG_mLiver.txt',
+            sep = " ",
+            quote=FALSE,
+            row.names = FALSE,
+            col.names = FALSE)
 ```
