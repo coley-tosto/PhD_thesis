@@ -1,0 +1,341 @@
+---
+title: "Genetic diversity and Intersexual Fst in _Syngnathus scovelli_"
+author: "Coley Tosto"
+date: "`r Sys.Date()`"
+output:
+  bookdown::pdf_document2:
+    fig_caption: yes
+    keep_tex: yes
+    number_sections: no
+    toc: false
+header-includes: >
+  \usepackage{lipsum}
+  \usepackage{float}
+  \floatplacement{figure}{H}
+editor_options:
+  chunk_output_type: console
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir='../',fig_path="../imgs/")
+```
+
+``` {r library, message = FALSE, warning = FALSE}
+#This is a cohesive list of all the libraries used in this document
+library(DESeq2)
+```
+
+``` {r functions, include = FALSE}
+```
+
+``` {r read-data, message = FALSE, warning = FALSE}
+#Tajima's D data calculated with ANGSD
+tajD <- read.delim("data/scovelli.thetas.idx.pestPG", header = TRUE)
+
+#The abundance matrix generated via salmon and tximport to be used for the DE analysis
+txi.salmon <- readRDS("data/txi.salmon_SS.RDS")
+
+#The samples file generated for tximport to be used for DE analysis
+samples <- read.table("SS_samples.txt", header = TRUE)
+
+#Make sure the conditions are in the samples file as a factor
+samples$Sex <- as.factor(samples$Sex)
+samples$Organ <- as.factor(samples$Organ)
+```
+
+# Generating BAM files
+`Bowtie2` was used to map the processed reads back to the reference transcriptome, generating SAM files that will be converted to BAM files and coordinate sorted with `SAMtools` and then used by ANGSD to calculate measurements of Tajima's $D$ and intersexual $F_{st}$.
+
+`Bowtie2` was installed inside of a conda environment on the RCC named `trinity`. Bowtie2 v2.5.0 was used. `SAMtools` was installed in the same conda environment, v1.18 was used. The following script was then used to generate the index, map the reads back to it to create the SAM files, then convert those SAM files to BAM files, and finally coordinate sort the BAM files.
+
+```{bash, eval = FALSE, file="bash/bowtie2_alignment.sh"}
+
+```
+
+The script was run as `nohup bash bash_scripts/bowtie2_alignment.sh trinity_supertran_scovelli.fasta bowtie2_index/scovelli scovelli_kmer_corrected/ scovelli_SAM/ scovelli_BAM/ > bt2.log 2>&1 &`.
+
+# Running ANGSD
+ANGSD will be used for the calculation of both Tajima's $D$ and also Intersexual $F_{st}$. It was installed in the `shared/` folder on the RCC following the instructions given on their [website](http://www.popgen.dk/angsd/index.php/Installation) as:
+
+```
+wget http://popgen.dk/software/download/angsd/angsd0.940.tar.gz
+tar xf angsd0.940.tar.gz
+
+cd htslib;make;cd ..
+
+cd angsd
+make HTSSRC=../htslib
+cd ..
+```
+
+ANGSD version 0.940-dirty was used for the analysis.
+
+The following script was then used to filter the BAM files, estimate site frequency spectrum (SFS), calculate the thetas and the calculate Tajima's $D$ when `$ALLSFS=true and $THETAS=true`. It was then also used to filter BAM files and estimate SFS **separately** for males and females, combine them together and then calculate intersexual $F_{st}$ when `$INDSFS=true and $MFFST=true`.
+
+```{bash, eval=FALSE, file='bash/angsd.sh'}
+
+
+```
+
+#### When $ALLSFS=true and $THETAS=true
+
+Following the [ANGSD website](angsd/index.php/Thetas,Tajima,Neutrality_tests) we can see the first step for calculate Tajima's $D$ is to **filter and estimate SFS**:
+
+  - To get the estimates of SFS you first generate a `.saf` file (site allele frequency likelihood) followed by an optimization of the `.saf` file which will then estimate the site frequency spectrum.
+    - `doSaf 1` was used to calculate saf based on individual genotype likelihoods assuming HWE.
+    - `GL 1` was used since SAMtools was used to generate the BAM files.
+    - Because we don't have the ancestral state, we estimated the folded SFS by giving `-anc` the reference transcriptome and applying `-fold 1` to `realSFS`.
+    
+  - For filtering, many options were used:
+    - `minMapQ`: set the minimum mapping quality (20 was used here)
+    - `remove_bads`: removes reads with a flag above 255 (set to 1 for remove)
+    - `uniqueOnly`: when set to 1, removes reads that have multiple best hits
+    - `only_proper_pairs`: when set to 1, includes only pairs of reads where both mates mapped correctly
+    - `minQ`: Minimum base quality score (set to 13 here)
+    - `minInd`: Remove if there was data in less than X individuals (4 here).
+    
+The second step is to then **calculate the thetas for each site**:
+  - This is done using the `.sfa.idx` and the `.sfs` files from the step before
+  
+Lastly, with the output from the thetas calculation (`.thetas.idx`) we can **estimate Tajima's $D$**.
+
+#### When $INDSFS=true and $MFFST=true
+
+Following the [ANGSD website](http://popgen.dk/angsd/index.php/Fst) we can see the first step for calculating $F_{st}$ is similar to Tajima's $D$, we have to **filter and estimate SFS**. The difference here is that we calculate the SAF **SEPARATELY** for the different populations and then put them together with the `realSFS` function. Because we want to look at differences between males and females our different "populations" are the two sexes.
+
+  - `-fold 1` was given to `realSFS` again because we do not have the ancestral state.
+  
+  - The same filtering that was used for Tajima's $D$ was applied here, however this time the RNA-seq data was filtered to only included bases where we had data in more than half of the individuals for male and females separately.
+    - This was done by setting `minInd` to 7
+    
+After getting the male-female SFSs and combining them, intersexual $F_{st}$ can be calculated with `realSFS fst`.
+
+# Tajima's D
+After running ANGSD we can start to look through some of the results. To start with I am plotting the site frequency spectrum that was generated by ANGSD.
+
+```{r SFS, echo=FALSE, fig.cap="Site frequency spectrum calculated by ANGSD."}
+##Read in the data
+sfs <- scan('data/scovelliFolded.sfs')
+
+#The variable categories of the sfs
+sfs <- sfs[-c(1,length(sfs))]
+sfs <- sfs/sum(sfs)
+
+#Plot it
+barplot(sfs, names=1:length(sfs),
+        main='SFS', ylab = "Proportions",
+        col = 'indianred4')
+
+```
+
+I then want to look at the overall distribution of Tajima's $D$ that was calculated. Additionally, I want to see if each row of the Tajima's $D$ dataset corresponds to an individual gene. There are `r nrow(tajD)` rows in the Tajima's $D$ dataset. If each row was one gene than I would have originally expected to see `r nrow(txi.salmon$counts)` rows as that is how many Trinity genes we have in our assembly. If we look as the unique IDs for our "chromosome" column in the Tajima's $D$ dataset we can see that there are `r length(unique(tajD$Chr))` unique IDs. This does tell us that each row is likely to be an individual Trinity gene and it is possible that the low amount of rows here compared to the number of genes in out transcriptome could be due to the filtering restrictions we applied above.
+
+```{r TajHist, echo=FALSE, fig.cap="Histogram showing the ditribution of Tajima's D values."}
+hist(tajD$Tajima,
+     xlab = "Tajima's D",
+     ylab = "Number of genes",
+     main = "")
+```
+
+It appears that the low number of genes that we are seeing here may be due to a lack of sufficient individuals being aligned to the same regions, and then whether those regions are variable enough for the pop gen statistics to be calculated. 
+
+## Tajima's D and Sex-biased Gene Expression
+I want to see if I have enough data to be able to compare TD values in unbiased genes to sex-biased genes. To do that I first need to read in a dataset that contains information about which genes are sex-biased and which are unbiased. I created this dataset in the `scovelli_diff_expr_analysis.Rmd` document. 
+
+```{r readin-logFC-dataset}
+
+logFC <- read.csv("data/logFC_long_bias_cats.csv")
+
+```
+
+Now that we have the logFC dataset I want to merge it with the Tajima's D dataset to see how many unbiased v biased genes we have data for!
+
+```{r mergeTD-SB}
+#Merge the datasets
+logFC_TD <- merge(logFC, tajD[,2:14], by.x = "geneID", by.y = "Chr", all.x = TRUE)
+
+#Subset the dataset to only include rows where Tajima's D is not NA
+logFC_TD <- logFC_TD[!(is.na(logFC_TD$Tajima)),]
+
+#Remove all of the sex-specific genes from the dataset (Only interested in sex-biased)
+#logFC_TD <- logFC_TD[logFC_TD$bias_cat != "Sex-specific", ]
+
+#Remove the brain from the dataset
+logFC_TD <- logFC_TD[logFC_TD$tissue != "Brain", ]
+
+#Export this merged dataset to use for making figures
+#write.csv(logFC_TD, "data/bias_cats_tajD.csv", row.names = FALSE)
+
+#See how many data points we have for each bias category
+tapply(logFC_TD$Tajima[logFC_TD$tissue == "Gonad"], 
+       logFC_TD$bias[logFC_TD$tissue == "Gonad"], 
+       mean)
+tapply(logFC_TD$Tajima[logFC_TD$tissue == "Liver"], 
+       logFC_TD$bias[logFC_TD$tissue == "Liver"], 
+       mean)
+tapply(logFC_TD$Tajima[logFC_TD$tissue == "Skin"], 
+       logFC_TD$bias[logFC_TD$tissue == "Skin"], 
+       mean)
+```
+
+From the above numbers it looks like we will really only have enough data in the gonads to get an idea about what relationship may occur between sex-biased gene expression and Tajima's D. The other organs just don't have enough points in the biased categories.
+
+Regardless, I want to begin to visualize what relationship may be present, so I am plotting Tajima's D versus bias categories for all three of the organs.
+
+### Tajima's D across the different bias categories
+
+```{r plotTD-SB}
+#Create a quick plot to show TD values across the different groups
+par(mfrow=c(1, 3))
+boxplot(logFC_TD$Tajima[logFC_TD$tissue == "Gonad"] ~ logFC_TD$bias[logFC_TD$tissue == "Gonad"],
+        xlab = "Bias Level",
+        ylab = "Tajima's D",
+        main = "Gonad")
+boxplot(logFC_TD$Tajima[logFC_TD$tissue == "Liver"] ~ logFC_TD$bias[logFC_TD$tissue == "Liver"],
+        xlab = "Bias Level",
+        ylab = "Tajima's D",
+        main = "Liver")
+boxplot(logFC_TD$Tajima[logFC_TD$tissue == "Skin"] ~ logFC_TD$bias[logFC_TD$tissue == "Skin"],
+        xlab = "Bias Level",
+        ylab = "Tajima's D",
+        main = "Skin")
+
+
+#pairwise.wilcox.test(logFC_TD[logFC_TD$tissue == "Gonad", ]$Tajima, logFC_TD[logFC_TD$tissue == "Gonad", ]$bias, p.adjust.method = "holm")
+```
+
+It appears that for all three tissues, unbiased genes seem to have the lowest median Tajima's D values. Let's now play around with adding some significance to these differences, I am first going to see if the data fit the assumptions to run an ANOVA.
+
+```{r TDvbias-anova}
+logFC_TD$bias <- as.factor(logFC_TD$bias)
+logFC_TD$tissue <- as.factor(logFC_TD$tissue)
+
+#Set-up two-way ANOVA
+td_aov <- aov(logFC_TD$Tajima ~ logFC_TD$bias*logFC_TD$tissue)
+summary(td_aov)
+
+par(mfrow = c(2,2))
+plot(td_aov)
+
+#Test for homogeneity of variances
+library(car)
+leveneTest(td_aov) #Variances are not equal
+
+#Test for normal distribution of residuals
+par(mfrow = c(1,1))
+hist(resid(td_aov))
+
+library(moments)
+skewness(resid(td_aov)) #almost 2
+kurtosis(resid(td_aov)) #8.6, pretty high, both values not showing normal distribution
+
+```
+
+Unsurprisingly, the data violate two of the major assumptions for an ANVOA, there is no homogeneity of variances and the residuals are not normally distributed
+
+```{r}
+test <- aggregate(logFC_TD$Tajima,
+                  by = list(b = logFC_TD$bias,
+                            t = logFC_TD$tissue),
+                  FUN = mean)
+
+friedman.test(x ~ b | t, data = test)
+```
+
+
+
+### Modeling the relationship between sex-biased gene expression and Tajima's D
+
+```{r}
+
+fit_poly <- function(degree){
+  
+  model <- lm(Tajima ~ poly(logFC, degree), 
+              data = logFC_TD[logFC_TD$tissue == "Gonad", ])
+  return(AIC(model))
+  
+}
+
+degrees <- 1:5
+
+aic_values <- sapply(degrees, fit_poly)
+
+optimal_degree <- degrees[which.min(aic_values)]
+
+cat("Optimal Polynomial Degree:", optimal_degree, "\n")
+
+optimal_model <- lm(Tajima ~ poly(logFC, optimal_degree), 
+                    data = logFC_TD[logFC_TD$tissue == "Gonad", ] )
+
+summary(optimal_model)
+
+linear_model <- lm(Tajima ~ logFC, 
+                    data = logFC_TD[logFC_TD$tissue == "Gonad", ])
+
+lrtest(linear_model, optimal_model)
+
+gam_model <- gam(Tajima ~ s(logFC, bs = "cr"), 
+                    data = logFC_TD[logFC_TD$tissue == "Gonad", ])
+```
+
+```{r}
+# Set the range of polynomial degrees to consider
+degrees <- 1:5
+
+# Create an empty vector to store adjusted p-values
+comp_values <- data.frame(matrix(ncol = 3,
+                          nrow = 0))
+
+# Perform likelihood ratio tests for each degree
+for (i in degrees) {
+  #browser()
+  # Fit the polynomial model
+  poly_model <- lm(Tajima ~ poly(logFC, i), 
+                   data = logFC_TD[logFC_TD$tissue == "Gonad", ])
+  
+  # Fit the simpler model (without polynomial terms)
+  simpler_model <- lm(Tajima ~ logFC, 
+                      data = logFC_TD[logFC_TD$tissue == "Gonad", ])
+  
+  # Perform the likelihood ratio test
+  lr_test <- lrtest(simpler_model, poly_model)
+  
+  # Calculate the adjusted p-value and AIC
+  adj_p_value <- lr_test$`Pr(>Chisq)`[2] * length(degrees)
+  AIC <- AIC(poly_model)
+  polynomial <- i
+  
+  tmp <- cbind(polynomial, AIC, adj_p_value)
+  comp_values <- rbind(comp_values, tmp)
+}
+
+
+```
+
+```{r}
+
+ggplot(logFC_TD[logFC_TD$tissue == "Gonad", ],
+       aes(x = logFC, y = Tajima)) +
+  geom_point(aes(color = bias)) +
+  scale_color_manual(name = "Bias Level",
+                     values = c("MB" = "#beaed475",
+                                "FB" = "#7fc97f75",
+                                "NB" = "darkgray"),
+                     labels = c("Female-biased",
+                                "Male-biased",
+                                "Unbiased")) +
+  stat_smooth(method = 'lm',
+              formula = y ~ poly(x, 3),
+              size = 1,
+              col = "black",
+              linetype = "dashed") +
+  labs(title = "Polynomial Regression Model (Degree 3)",
+       x = "SexBias",
+       y = "TajimasD") +
+  theme(panel.grid.major = element_blank(), 
+          panel.grid.minor = element_blank(), 
+          panel.background = element_blank(), 
+          axis.line = element_line(colour = "black"))
+```
+
